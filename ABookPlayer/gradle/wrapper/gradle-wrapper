@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Placeholder wrapper that calls 'gradle' if installed.
+exec gradle "$@"

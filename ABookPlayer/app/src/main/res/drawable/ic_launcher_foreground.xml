@@ -1,0 +1,37 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Headphone Arch (Headband) -->
+    <path
+        android:fillColor="#E5A93C"
+        android:pathData="M34,48 C34,32.5 43,26 54,26 C65,26 74,32.5 74,48 L70,48 C70,35.5 62.8,30 54,30 C45.2,30 38,35.5 38,48 Z"/>
+
+    <!-- Headphone Left Ear Cup -->
+    <path
+        android:fillColor="#FFC868"
+        android:pathData="M30,46 H37 V64 H30 C27.8,64 26,62.2 26,60 V50 C26,47.8 27.8,46 30,46 Z"/>
+
+    <!-- Headphone Right Ear Cup -->
+    <path
+        android:fillColor="#FFC868"
+        android:pathData="M71,46 H78 C80.2,46 82,47.8 82,50 V60 C82,62.2 80.2,64 78,64 H71 Z"/>
+
+    <!-- Open Book Left Page -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,64 L40,57 C38.5,56.2 37,57.3 37,59 L37,73 C37,74.2 38,75 39.2,75.5 L54,80 Z"/>
+
+    <!-- Open Book Right Page -->
+    <path
+        android:fillColor="#E0E0E0"
+        android:pathData="M54,64 L68,57 C69.5,56.2 71,57.3 71,59 L71,73 C71,74.2 70,75 68.8,75.5 L54,80 Z"/>
+
+    <!-- Glowing Play Triangle -->
+    <path
+        android:fillColor="#E5A93C"
+        android:pathData="M50,44 L63,51 L50,58 Z"/>
+
+</vector>

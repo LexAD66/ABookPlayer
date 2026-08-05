@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ABook Player</string>
+    <string name="library_title">Meine Hörbücher</string>
+    <string name="library_empty">Keine Hörbücher gefunden. Lege Dateien im Ordner /Download/ABook/ ab.</string>
+    <string name="library_author">von %1$s</string>
+    <string name="details_play">Abspielen</string>
+    <string name="details_chapters">Kapitel</string>
+    <string name="player_title">Player</string>
+    <string name="player_playpause">Play/Pause</string>
+    <string name="player_next">Weiter</string>
+    <string name="player_prev">Zurück</string>
+    <string name="player_seconds">%1$d s</string>
+    <string name="notification_channel_name">ABook Wiedergabe</string>
+    <string name="notification_content_title">ABook Player</string>
+    <string name="notification_content_text_active">Wiedergabe aktiv</string>
+    <string name="notification_content_text_ready">Wiedergabe bereit</string>
+
+    <!-- Sleep Timer & Player Extensions -->
+    <string name="sleep_timer_title">Sleep-Timer wählen</string>
+    <string name="sleep_timer_active">Sleep-Timer aktiv (%1$s)</string>
+    <string name="sleep_timer_chapter_active">Sleep-Timer aktiv (Kapitelende)</string>
+    <string name="sleep_timer_stop_chapter">Am Ende des Kapitels stoppen</string>
+    <string name="sleep_timer_disable">Timer deaktivieren</string>
+    <string name="sleep_timer_minutes">%1$d Minuten</string>
+    <string name="cancel">Abbrechen</string>
+
+    <string name="player_skip_silence">Stille überspringen</string>
+    <string name="player_volume_boost">Lautstärke-Boost</string>
+
+    <!-- Import & Storage Status Meldungen -->
+    <string name="import_error_zip_bomb">Import abgebrochen: Datei ist zu stark komprimiert oder überschreitet das Entpackungs-Limit.</string>
+    <string name="import_error_file_too_large">Import abgebrochen: Einzeldatei überschreitet das Limit von 500 MB.</string>
+    <string name="import_error_zip_slip">Import abgebrochen: Ungültiger oder unsicherer Dateipfad im Archiv.</string>
+    <string name="import_success">Hörbuch erfolgreich importiert.</string>
+</resources>

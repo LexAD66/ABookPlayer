@@ -1,0 +1,20 @@
+# Dateiliste
+
+- `01_dokumentstatus-und-konsolidierungsregeln.md`
+- `02_projektueberblick.md`
+- `03_technologiestack-und-entwicklungsumgebung.md`
+- `04_architektur.md`
+- `05_empfohlene-projekt-und-paketstruktur.md`
+- `06_datenmodell.md`
+- `07_import-und-storage.md`
+- `08_spezifikation-des-abook-formats.md`
+- `09_audio-wiedergabe.md`
+- `10_benutzeroberflaeche-und-navigation.md`
+- `11_funktionsumfang-und-status.md`
+- `12_teststrategie-und-qualitaetssicherung.md`
+- `13_roadmap.md`
+- `14_migrations-und-konsolidierungsleitfaden.md`
+- `15_master-prompt-fuer-gemini-flash-25.md`
+- `16_quellenzuordnung.md`
+- `17_schlussfolgerung.md`
+- `README.md`

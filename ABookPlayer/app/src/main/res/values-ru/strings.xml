@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ABook Player</string>
+    <string name="library_title">Аудиокниги</string>
+    <string name="library_empty">Книги не найдены. Поместите файлы .abook в /Download/ABook/.</string>
+    <string name="library_author">автор: %1$s</string>
+    <string name="details_play">Воспроизвести</string>
+    <string name="details_chapters">Главы</string>
+    <string name="player_title">Плеер</string>
+    <string name="player_playpause">Воспроизведение/Пауза</string>
+    <string name="player_next">Вперед</string>
+    <string name="player_prev">Назад</string>
+    <string name="player_seconds">%1$d с</string>
+    <string name="notification_channel_name">Воспроизведение ABook</string>
+    <string name="notification_content_title">ABook Player</string>
+    <string name="notification_content_text_active">Воспроизведение активно</string>
+    <string name="notification_content_text_ready">Готово</string>
+</resources>

@@ -1,0 +1,15 @@
+{
+  "title": "Demo ABook",
+  "author": "F. Soft",
+  "description": "Kurzes Beispiel ohne echte Audiodaten.",
+  "chapters": [
+    {
+      "file": "01_intro.mp3",
+      "title": "Intro"
+    },
+    {
+      "file": "02_scene.mp3",
+      "title": "Szene"
+    }
+  ]
+}

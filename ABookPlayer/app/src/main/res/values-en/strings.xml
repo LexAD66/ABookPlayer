@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ABook Player</string>
+    <string name="library_title">My Audiobooks</string>
+    <string name="library_empty">No books found. Put files into /Download/ABook/.</string>
+    <string name="library_author">by %1$s</string>
+    <string name="details_play">Play</string>
+    <string name="details_chapters">Chapters</string>
+    <string name="player_title">Player</string>
+    <string name="player_playpause">Play/Pause</string>
+    <string name="player_next">Next</string>
+    <string name="player_prev">Previous</string>
+    <string name="player_seconds">%1$d s</string>
+    <string name="notification_channel_name">ABook Playback</string>
+    <string name="notification_content_title">ABook Player</string>
+    <string name="notification_content_text_active">Playback active</string>
+    <string name="notification_content_text_ready">Ready</string>
+
+    <!-- Sleep Timer & Player Extensions -->
+    <string name="sleep_timer_title">Select Sleep Timer</string>
+    <string name="sleep_timer_active">Sleep timer active (%1$s)</string>
+    <string name="sleep_timer_chapter_active">Sleep timer active (End of chapter)</string>
+    <string name="sleep_timer_stop_chapter">Stop at end of chapter</string>
+    <string name="sleep_timer_disable">Disable timer</string>
+    <string name="sleep_timer_minutes">%1$d minutes</string>
+    <string name="cancel">Cancel</string>
+
+    <string name="player_skip_silence">Skip silence</string>
+    <string name="player_volume_boost">Volume boost</string>
+
+    <!-- Import & Storage Messages -->
+    <string name="import_error_zip_bomb">Import canceled: Archive is overly compressed or exceeds decompression limit.</string>
+    <string name="import_error_file_too_large">Import canceled: File exceeds 500 MB limit.</string>
+    <string name="import_error_zip_slip">Import canceled: Invalid or unsafe file path in archive.</string>
+    <string name="import_success">Audiobook successfully imported.</string>
+</resources>

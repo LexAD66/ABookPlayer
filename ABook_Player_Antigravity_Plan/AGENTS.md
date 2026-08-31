@@ -28,6 +28,9 @@ Die vorhandenen `.jsx`-Dateien und Screenshots sind Design-Referenzen, keine fin
 - Keine Terminal-Befehle mit destruktiver Wirkung ohne Bestätigung.
 - Keine Projektstruktur ersetzen, wenn Migration möglich ist.
 
+## Deployment-Regel (Option B)
+- Nach jeder erfolgreichen Änderung und Verifikation im gesamten Projekt (in allen Chat-Sitzungen) wird automatisch Option B ausgeführt (`.\gradlew.bat installDebug`), um die Änderungen direkt auf das per USB verbundene Smartphone/Emulator zu installieren.
+
 ## Prioritäten
 1. Kompilierbarer Code
 2. Kleine, nachvollziehbare Änderungen

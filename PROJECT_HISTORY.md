@@ -6,10 +6,23 @@ Diese Datei dokumentiert alle **abgeschlossenen Fortschritte** sowie alle **gepl
 
 ## 📊 Übersicht des aktuellen Projektstatus
 
-- **Status:** 🎉 ALLE Phasen (Phase 0 bis Phase 8) vollständig abgeschlossen!
-- **Letzte Aktualisierung:** 1. August 2026
-- **Build-Status:** 🟢 `BUILD SUCCESSFUL` (Alle Unit-, Storage-, Room-, Player-, SleepTimer- & APK Debug/Release-Builds bestanden)
+- **Status:** Phasen 0–19 umgesetzt und versioniert. Nächster Schwerpunkt: **Phase 20 – Library-Umstrukturierung** (siehe [`ABookPlayer/redesign.md`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/redesign.md)).
+- **Letzte Aktualisierung:** 31. August 2026
+- **Git:** Arbeitsstand der Phasen 15–19 in thematischen Commits gesichert (Sync, Audio-Engine, Figuren, Library-Wartung, Kapitel-Editor, Core-Verdrahtung). Sicherungs-Branch `backup/pre-cleanup-2026-08-31`.
+- **Build-Status:** ⏳ Verifikation nach dem Cleanup-Commit ausstehend (`gradlew test` / `assembleDebug`).
 - **Zielarchitektur:** Clean Architecture (MVVM mit Jetpack Compose, Media3, Room, Hilt)
+
+### 🔜 Phase 20: Library-Umstrukturierung (geplant)
+
+- [ ] Informationsarchitektur gemäß `redesign.md` umsetzen: Trennung von **Bibliothek** (Hörfluss) und **Bibliothek verwalten** (Scan, Cleanup, Duplikate, Dauer-Reparatur, Speicherort-Migration).
+- [ ] Top-Bar entschlacken: nur Suche, Ansicht (Liste/Raster), Mehr-Menü.
+- [ ] Kompakte Active-Filter-Bar (max. 2–3 sichtbare Chips + `Filter`-Button) statt mehrerer Chip-Zeilen.
+- [ ] Import/Scan/Cleanup aus einem Sammel-Dialog in ein `Hinzufügen`-Bottom-Sheet + eigenen Wartungsbereich aufteilen.
+- [ ] Favoriten persistent machen (Room statt nur ViewModel-State).
+- [ ] „Neu importiert" nach echtem Importzeitpunkt sortieren statt nach DB-ID.
+- [ ] Automatischen Scan + Dauer-Reparatur beim `LibraryViewModel`-Start entfernen.
+- [ ] Serienansicht als bewusster Modus behandeln (nur bei `Sortierung = Serien`).
+- [ ] Tests: `LibraryViewModelTest` erweitern; Build-Verifizierung.
 
 ---
 
@@ -111,6 +124,24 @@ Diese Datei dokumentiert alle **abgeschlossenen Fortschritte** sowie alle **gepl
 - [x] **3. ⏱️ Neue Sortieroptionen:** Sortierung nach `RESTLAUFZEIT` (Kürzeste Restzeit zuerst) und `HINZUGEFUEGT_AM` (Neueste zuerst).
 - [x] **4. 📦 Stapelverarbeitung (Multi-Select):** Stapelfavoritisierung via Stern-Button und Stapellöschen via Mülleimer-Button inkl. Material 3 `AlertDialog`.
 - [x] **5. Testverifizierung:** Erweiterung von [`LibraryViewModelTest.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/test/java/de/f_soft_studio/abookplayer/ui/LibraryViewModelTest.kt) (🟢 `BUILD SUCCESSFUL in 12s`).
+
+### Phase 16: Audio Enhancements, Equalizer Presets & Loudness Normalization (Release 1.2.0)
+- [x] **1. Loudness & Equalizer Engine:** Erstellung von [`LoudnessController.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/main/java/de/f_soft_studio/abookplayer/player/controller/LoudnessController.kt) mit Anbindung an ExoPlayer AudioSessionId, Support für Presets (*Voice Boost*, *Bass Reduction*, *Night Mode*, *Custom 5-Band*) & anpassbarem Loudness Gain (+0 dB bis +15 dB).
+- [x] **2. Equalizer & Boost UI Dialog:** Überarbeitung von [`EqualizerDialog.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/main/java/de/f_soft_studio/abookplayer/ui/player/EqualizerDialog.kt) mit Slider für Verstärkung, Preset-Auswahl und "Stille überspringen" Umschaltung.
+- [x] **3. State Management & ViewModel Integration:** Erweiterung von [`PlaybackController.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/main/java/de/f_soft_studio/abookplayer/player/controller/PlaybackController.kt) und [`PlayerViewModel.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/main/java/de/f_soft_studio/abookplayer/ui/player/PlayerViewModel.kt).
+- [x] **4. Testabdeckung & Build-Verifizierung:** Erstellung von [`LoudnessControllerTest.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/test/java/de/f_soft_studio/abookplayer/player/LoudnessControllerTest.kt) (🟢 `BUILD SUCCESSFUL in 59s`).
+
+### Phase 17: WebDAV Cloud-Sync & Nextcloud Backup (Release 1.3.0)
+- [x] **1. WebDAV Sync Engine & DTOs:** Erstellung von [`SyncDataModels.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/main/java/de/f_soft_studio/abookplayer/storage/sync/SyncDataModels.kt) und [`WebDavSyncManager.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/main/java/de/f_soft_studio/abookplayer/storage/sync/WebDavSyncManager.kt) (HTTP PUT/GET Sync für Nextcloud / ownCloud).
+- [x] **2. Bidirektionale Konfliktbehandlung (UseCase):** Erstellung von [`SyncProgressUseCase.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/main/java/de/f_soft_studio/abookplayer/domain/usecase/SyncProgressUseCase.kt) ("Neuester Timestamp gewinnt" für Hörpositionen & Lesezeichen).
+- [x] **3. Sync-Einstellungen & Dialog UI:** Erstellung von [`SyncSettingsDialog.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/main/java/de/f_soft_studio/abookplayer/ui/settings/SyncSettingsDialog.kt) & Einbindung in [`SettingsScreen.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/main/java/de/f_soft_studio/abookplayer/ui/settings/SettingsScreen.kt).
+- [x] **4. Testabdeckung & Build-Verifizierung:** Erstellung von [`SyncProgressUseCaseTest.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/test/java/de/f_soft_studio/abookplayer/domain/SyncProgressUseCaseTest.kt) (🟢 `BUILD SUCCESSFUL in 22s`).
+
+### Phase 19: Smart Audio Engine & Custom Kapitel-Editor (Release 2.0.0)
+- [x] **1. Smart Sleep Bookmark:** Automatisches Erstellen von "Einschlaf-Start (Timer)" Lesezeichen beim Starten des Sleep-Timers.
+- [x] **2. Interaktiver Kapitel-Editor UI:** Erstellung von [`EditChaptersDialog.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/main/java/de/f_soft_studio/abookplayer/ui/chapters/EditChaptersDialog.kt) zum Hinzufügen, Umbenennen, Verschieben und Löschen von Kapiteln inkl. Zeitstempel-Parsing (`HH:MM:SS`).
+- [x] **3. Navigation & App Integration:** Einbindung des Kapitel-Editors in [`ChaptersScreen.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/main/java/de/f_soft_studio/abookplayer/ui/chapters/ChaptersScreen.kt) und [`AppRoot.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/main/java/de/f_soft_studio/abookplayer/ui/AppRoot.kt).
+- [x] **4. Testabdeckung & Build-Verifizierung:** Erstellung von [`SmartSleepBookmarkTest.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/test/java/de/f_soft_studio/abookplayer/player/SmartSleepBookmarkTest.kt) (🟢 `BUILD SUCCESSFUL in 23s`).
 
 ---
 

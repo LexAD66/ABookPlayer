@@ -19,10 +19,15 @@ Diese Datei dokumentiert alle **abgeschlossenen Fortschritte** sowie alle **gepl
 - [ ] Kompakte Active-Filter-Bar (max. 2–3 sichtbare Chips + `Filter`-Button) statt mehrerer Chip-Zeilen.
 - [ ] Import/Scan/Cleanup aus einem Sammel-Dialog in ein `Hinzufügen`-Bottom-Sheet + eigenen Wartungsbereich aufteilen.
 - [ ] Favoriten persistent machen (Room statt nur ViewModel-State).
-- [ ] „Neu importiert" nach echtem Importzeitpunkt sortieren statt nach DB-ID.
-- [ ] Automatischen Scan + Dauer-Reparatur beim `LibraryViewModel`-Start entfernen.
+- [x] `addedAt`-Spalte + Room-Migration 9→10; „Neu importiert" sortiert nach `addedAt`.
+- [x] Automatischen Scan + Dauer-Reparatur aus `LibraryViewModel.init` entfernt.
+- [x] `LibraryMaintenanceUiState` (isScanning / isCleaning / lastScanMessage / duplicates / cleanupResult) eingeführt.
 - [ ] Serienansicht als bewusster Modus behandeln (nur bei `Sortierung = Serien`).
 - [ ] Tests: `LibraryViewModelTest` erweitern; Build-Verifizierung.
+
+> Backend-Teil (Spec A, `docs/superpowers/specs/2026-08-31-library-backend-design.md`)
+> abgeschlossen. Offen: UI-Umbau (Spec B) – Top-Bar, Filter-Bottom-Sheet,
+> Add-Bottom-Sheet, `library_management`-Screen, Zerlegung von `LibraryScreen.kt`.
 
 ---
 

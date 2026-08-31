@@ -13,6 +13,7 @@ package de.f_soft_studio.abookplayer.domain.model
  * @property duration Gesamtdauer in Millisekunden.
  * @property currentPosition Aktuelle Wiedergabeposition in Millisekunden.
  * @property lastPlayed Zeitstempel der letzten Wiedergabe.
+ * @property addedAt Zeitstempel des Imports (für Sortierung „Neu importiert").
  */
 data class Audiobook(
     val id: Long = 0,
@@ -25,6 +26,7 @@ data class Audiobook(
     val duration: Long = 0L,
     val currentPosition: Long = 0L,
     val lastPlayed: Long = System.currentTimeMillis(),
+    val addedAt: Long = System.currentTimeMillis(),
     val parentSeries: String? = null,
     val series: String? = null,
     val seriesOrder: Int? = null,

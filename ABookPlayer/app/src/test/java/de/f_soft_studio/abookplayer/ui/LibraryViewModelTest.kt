@@ -237,5 +237,22 @@ class LibraryViewModelTest {
         assertEquals(1, seriesItem.stack.books[0].seriesOrder)
         assertEquals(2, seriesItem.stack.books[1].seriesOrder)
     }
+
+    @Test
+    fun testAddedAtDefaultsToNowAndPersistsExplicitValue() = runBlocking {
+        val idDefault = repository.saveAudiobook(
+            Audiobook(title = "Ohne Datum", author = "A", filePath = "/p1")
+        )
+        val idExplicit = repository.saveAudiobook(
+            Audiobook(title = "Mit Datum", author = "A", filePath = "/p2", addedAt = 1_700_000_000_000L)
+        )
+
+        val all = repository.getAllAudiobooks().first { it.size == 2 }
+        val byDefault = all.first { it.id == idDefault }
+        val byExplicit = all.first { it.id == idExplicit }
+
+        assertTrue("Default-addedAt sollte gesetzt sein", byDefault.addedAt > 0L)
+        assertEquals(1_700_000_000_000L, byExplicit.addedAt)
+    }
 }
 

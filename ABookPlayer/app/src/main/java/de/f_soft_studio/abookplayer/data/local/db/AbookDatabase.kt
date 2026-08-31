@@ -28,7 +28,7 @@ import de.f_soft_studio.abookplayer.data.local.entity.ListeningSessionEntity
         ListeningSessionEntity::class,
         CharacterEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class AbookDatabase : RoomDatabase() {
@@ -106,6 +106,16 @@ abstract class AbookDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE audiobooks ADD COLUMN addedAt INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    "UPDATE audiobooks SET addedAt = " +
+                        "CASE WHEN lastPlayed > 0 THEN lastPlayed ELSE strftime('%s','now')*1000 END"
+                )
+            }
+        }
+
         fun getInstance(context: Context): AbookDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -113,7 +123,10 @@ abstract class AbookDatabase : RoomDatabase() {
                     AbookDatabase::class.java,
                     "abook_database.db"
                 )
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    .addMigrations(
+                        MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+                        MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10
+                    )
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

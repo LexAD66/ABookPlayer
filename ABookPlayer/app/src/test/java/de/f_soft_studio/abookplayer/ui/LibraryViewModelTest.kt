@@ -254,5 +254,23 @@ class LibraryViewModelTest {
         assertTrue("Default-addedAt sollte gesetzt sein", byDefault.addedAt > 0L)
         assertEquals(1_700_000_000_000L, byExplicit.addedAt)
     }
+
+    @Test
+    fun testSortByAddedAtUsesAddedAtNotId() = runBlocking {
+        // Zuerst gespeichert (kleine id), aber neueres addedAt:
+        repository.saveAudiobook(
+            Audiobook(title = "Zuerst gespeichert", author = "A", filePath = "/p1", addedAt = 2_000L)
+        )
+        // Danach gespeichert (größere id), aber älteres addedAt:
+        repository.saveAudiobook(
+            Audiobook(title = "Danach gespeichert", author = "A", filePath = "/p2", addedAt = 1_000L)
+        )
+
+        viewModel.onSortOrderChanged(SortOrder.HINZUGEFUEGT_AM)
+
+        val sorted = viewModel.audiobooks.first { it.size == 2 }
+        assertEquals("Zuerst gespeichert", sorted[0].title) // größeres addedAt zuerst
+        assertEquals("Danach gespeichert", sorted[1].title)
+    }
 }
 

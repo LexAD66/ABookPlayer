@@ -236,7 +236,7 @@ class LibraryViewModel(
                     .thenBy { it.title.lowercase() }
             )
             SortOrder.RESTLAUFZEIT -> statusFiltered.sortedBy { maxOf(0L, it.duration - it.currentPosition) }
-            SortOrder.HINZUGEFUEGT_AM -> statusFiltered.sortedByDescending { it.id }
+            SortOrder.HINZUGEFUEGT_AM -> statusFiltered.sortedByDescending { it.addedAt }
         }
     }.stateIn(
         scope = viewModelScope,

@@ -28,7 +28,7 @@ import de.f_soft_studio.abookplayer.data.local.entity.ListeningSessionEntity
         ListeningSessionEntity::class,
         CharacterEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class AbookDatabase : RoomDatabase() {
@@ -116,6 +116,26 @@ abstract class AbookDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Bereinigt bestehende Kapiteltitel um Audio-Datei-Endungen (z. B. "116 – Kapitel 116.mp3"),
+         * die bei früheren SAF-Ordner-Importen mitgespeichert wurden und in Android Auto / auf dem
+         * Sperrbildschirm als Titel auftauchten.
+         */
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "UPDATE chapters SET title = SUBSTR(title, 1, LENGTH(title) - 5) " +
+                        "WHERE LOWER(SUBSTR(title, -5)) IN ('.flac', '.opus')"
+                )
+                db.execSQL(
+                    "UPDATE chapters SET title = SUBSTR(title, 1, LENGTH(title) - 4) " +
+                        "WHERE LOWER(SUBSTR(title, -4)) IN " +
+                        "('.mp3', '.m4a', '.m4b', '.ogg', '.wav', '.aac', '.wma')"
+                )
+                db.execSQL("UPDATE chapters SET title = TRIM(title)")
+            }
+        }
+
         fun getInstance(context: Context): AbookDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -125,7 +145,7 @@ abstract class AbookDatabase : RoomDatabase() {
                 )
                     .addMigrations(
                         MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-                        MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10
+                        MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11
                     )
                     .fallbackToDestructiveMigration()
                     .build()

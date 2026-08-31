@@ -126,10 +126,13 @@ class AbookPlaybackService : MediaLibraryService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val titleText = audiobook?.title ?: "ABook Player"
-        val subtitleText = currentChapter?.title?.let { "Kapitel: $it" }
-            ?: audiobook?.author?.ifBlank { "Hörbuch-Wiedergabe aktiv" }
-            ?: "Hörbuch-Wiedergabe aktiv"
+        val texts = de.f_soft_studio.abookplayer.util.AudiobookMetadataText.derive(
+            bookTitle = audiobook?.title ?: "",
+            author = audiobook?.author ?: "",
+            chapterTitle = currentChapter?.title
+        )
+        val titleText = texts.title
+        val subtitleText = texts.subtitle ?: "Hörbuch-Wiedergabe aktiv"
 
         val coverBitmap = de.f_soft_studio.abookplayer.util.CoverHelper.loadCoverBitmap(
             context = this,
@@ -146,13 +149,13 @@ class AbookPlaybackService : MediaLibraryService() {
             .setOngoing(isPlaying)
             .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .addAction(android.R.drawable.ic_media_rew, "-10s", skipBackPendingIntent)
+            .addAction(R.drawable.ic_skip_back_10, "-10s", skipBackPendingIntent)
             .addAction(
                 if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
                 if (isPlaying) "Pause" else "Play",
                 playPausePendingIntent
             )
-            .addAction(android.R.drawable.ic_media_ff, "+10s", skipForwardPendingIntent)
+            .addAction(R.drawable.ic_skip_forward_10, "+10s", skipForwardPendingIntent)
 
         val session = PlaybackController.activeMediaSession
         if (session != null) {

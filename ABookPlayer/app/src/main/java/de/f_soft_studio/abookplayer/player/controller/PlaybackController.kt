@@ -25,10 +25,12 @@ import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import de.f_soft_studio.abookplayer.MainActivity
+import de.f_soft_studio.abookplayer.R
 import de.f_soft_studio.abookplayer.domain.model.Audiobook
 import de.f_soft_studio.abookplayer.domain.model.Chapter
 import de.f_soft_studio.abookplayer.domain.usecase.SaveProgressUseCase
 import de.f_soft_studio.abookplayer.player.service.AbookPlaybackService
+import de.f_soft_studio.abookplayer.util.AudiobookMetadataText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -140,15 +142,18 @@ class PlaybackController(
             val customCmdSkipBack = SessionCommand(AbookPlaybackService.ACTION_SKIP_10_BACKWARD, android.os.Bundle.EMPTY)
             val customCmdSkipFwd = SessionCommand(AbookPlaybackService.ACTION_SKIP_10_FORWARD, android.os.Bundle.EMPTY)
 
+            // Icons MÜSSEN App-eigene Ressourcen sein: Android Auto löst die Icon-Resource-ID
+            // einer Custom-Action gegen die Ressourcen der Media-App auf. android.R.drawable.*
+            // ist dort nicht auflösbar -> die Buttons würden in Android Auto verschwinden.
             val btnSkipBack = CommandButton.Builder()
                 .setDisplayName("-10s")
-                .setIconResId(android.R.drawable.ic_media_rew)
+                .setIconResId(R.drawable.ic_skip_back_10)
                 .setSessionCommand(customCmdSkipBack)
                 .build()
 
             val btnSkipFwd = CommandButton.Builder()
                 .setDisplayName("+10s")
-                .setIconResId(android.R.drawable.ic_media_ff)
+                .setIconResId(R.drawable.ic_skip_forward_10)
                 .setSessionCommand(customCmdSkipFwd)
                 .build()
 
@@ -317,29 +322,25 @@ class PlaybackController(
         val artworkBytes = de.f_soft_studio.abookplayer.util.CoverHelper.loadCoverBytes(audiobook.coverUri, audiobook.filePath)
 
         fun createMetadata(ch: Chapter? = null): MediaMetadata {
-            val chTitle = ch?.title?.ifBlank { null }
-            val rawTitle = chTitle ?: audiobook.title
-            val displayTitle = if (rawTitle.endsWith(".mp3", ignoreCase = true) || rawTitle.endsWith(".m4b", ignoreCase = true)) {
-                audiobook.title
-            } else {
-                rawTitle
-            }
+            val texts = AudiobookMetadataText.derive(
+                bookTitle = audiobook.title,
+                author = audiobook.author,
+                chapterTitle = ch?.title
+            )
 
             val builder = MediaMetadata.Builder()
-                .setTitle(displayTitle)
-                .setDisplayTitle(audiobook.title)
-                .setArtist(audiobook.author.ifBlank { "ABook Player" })
-                .setAlbumArtist(audiobook.author.ifBlank { "ABook Player" })
-                .setAlbumTitle(audiobook.title)
+                .setTitle(texts.title)
+                .setDisplayTitle(texts.title)
+                .setAlbumTitle(audiobook.title.ifBlank { texts.title })
                 .setFolderType(MediaMetadata.FOLDER_TYPE_NONE)
                 .setIsPlayable(true)
                 .setIsBrowsable(false)
 
-            if (!chTitle.isNullOrBlank() && chTitle != audiobook.title && !chTitle.endsWith(".mp3", true) && !chTitle.endsWith(".m4b", true)) {
-                builder.setSubtitle("$chTitle • ${audiobook.author}")
-            } else if (audiobook.author.isNotBlank()) {
-                builder.setSubtitle(audiobook.author)
+            texts.artist?.let {
+                builder.setArtist(it)
+                builder.setAlbumArtist(it)
             }
+            texts.subtitle?.let { builder.setSubtitle(it) }
 
             if (artworkBytes != null) {
                 builder.setArtworkData(artworkBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)

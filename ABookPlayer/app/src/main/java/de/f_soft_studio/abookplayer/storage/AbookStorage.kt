@@ -11,6 +11,7 @@ import de.f_soft_studio.abookplayer.domain.model.Audiobook
 import de.f_soft_studio.abookplayer.domain.model.Chapter
 import de.f_soft_studio.abookplayer.domain.model.ExportState
 import de.f_soft_studio.abookplayer.util.AbookModels
+import de.f_soft_studio.abookplayer.util.AudiobookMetadataText
 import de.f_soft_studio.abookplayer.util.ChapterDurations
 import de.f_soft_studio.abookplayer.util.ComparisonType
 import de.f_soft_studio.abookplayer.util.DuplicateDetector
@@ -392,11 +393,18 @@ class AbookStorage(
                     for (disc in discSubfolders.sortedBy { it.name }) {
                         disc.listFiles().filter { it.isFile && isAudioFile(it.name ?: "") }
                             .sortedBy { it.name }
-                            .forEach { f -> allDocAudioFiles.add(Pair("${disc.name} - ${f.name}", f)) }
+                            .forEach { f ->
+                                val chName = AudiobookMetadataText.stripAudioExtension(f.name ?: "Kapitel")
+                                allDocAudioFiles.add(Pair("${disc.name} - $chName", f))
+                            }
                     }
                 } else {
                     audioFiles.sortedBy { it.name }
-                        .forEach { f -> allDocAudioFiles.add(Pair(f.name ?: "Kapitel", f)) }
+                        .forEach { f ->
+                            allDocAudioFiles.add(
+                                Pair(AudiobookMetadataText.stripAudioExtension(f.name ?: "Kapitel"), f)
+                            )
+                        }
                 }
 
                 for ((chTitle, doc) in allDocAudioFiles) {

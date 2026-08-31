@@ -310,20 +310,38 @@ class LibraryViewModel(
         _statusFilter.value = filter
     }
 
-    private val _detectedDuplicates = MutableStateFlow<List<de.f_soft_studio.abookplayer.util.DuplicateMatch>>(emptyList())
-    val detectedDuplicates: StateFlow<List<de.f_soft_studio.abookplayer.util.DuplicateMatch>> = _detectedDuplicates.asStateFlow()
+    private val _maintenanceState = MutableStateFlow(LibraryMaintenanceUiState())
+    val maintenanceState: StateFlow<LibraryMaintenanceUiState> = _maintenanceState.asStateFlow()
+
+    /** Abgeleitete View für bestehende Consumer (LibraryScreen). */
+    val detectedDuplicates: StateFlow<List<de.f_soft_studio.abookplayer.util.DuplicateMatch>> =
+        _maintenanceState
+            .map { it.duplicates }
+            .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun scanAudiobooks() {
         viewModelScope.launch {
-            storage.clearDetectedDuplicates()
-            val imported = storage.scanAndImport()
-            _detectedDuplicates.value = storage.getDetectedDuplicates()
-            if (imported.isNotEmpty()) {
-                _messageEvent.emit("${imported.size} neue(s) Hörbuch(er) importiert")
-            } else if (_detectedDuplicates.value.isNotEmpty()) {
-                _messageEvent.emit("${_detectedDuplicates.value.size} identische(s) Duplikat(e) gefunden")
-            } else {
-                _messageEvent.emit("Scan beendet. Keine neuen Hörbücher oder Ordner gefunden.")
+            _maintenanceState.value = _maintenanceState.value.copy(isScanning = true)
+            try {
+                storage.clearDetectedDuplicates()
+                val imported = storage.scanAndImport()
+                val duplicates = storage.getDetectedDuplicates()
+                val message = when {
+                    imported.isNotEmpty() -> "${imported.size} neue(s) Hörbuch(er) importiert"
+                    duplicates.isNotEmpty() -> "${duplicates.size} identische(s) Duplikat(e) gefunden"
+                    else -> "Scan beendet. Keine neuen Hörbücher oder Ordner gefunden."
+                }
+                _maintenanceState.value = _maintenanceState.value.copy(
+                    duplicates = duplicates,
+                    lastScanMessage = message
+                )
+                _messageEvent.emit(message)
+            } catch (e: Exception) {
+                val message = "Scan fehlgeschlagen: ${e.message ?: "unbekannter Fehler"}"
+                _maintenanceState.value = _maintenanceState.value.copy(lastScanMessage = message)
+                _messageEvent.emit(message)
+            } finally {
+                _maintenanceState.value = _maintenanceState.value.copy(isScanning = false)
             }
         }
     }
@@ -331,7 +349,7 @@ class LibraryViewModel(
     fun importFromUri(uri: android.net.Uri) {
         viewModelScope.launch {
             val result = storage.importFromUri(uri)
-            _detectedDuplicates.value = storage.getDetectedDuplicates()
+            _maintenanceState.value = _maintenanceState.value.copy(duplicates = storage.getDetectedDuplicates())
             if (result != null) {
                 _messageEvent.emit("Hörbuch '${result.title}' erfolgreich importiert")
             } else {
@@ -344,11 +362,11 @@ class LibraryViewModel(
         viewModelScope.launch {
             storage.clearDetectedDuplicates()
             val count = storage.importFromFolderUri(uri)
-            _detectedDuplicates.value = storage.getDetectedDuplicates()
+            _maintenanceState.value = _maintenanceState.value.copy(duplicates = storage.getDetectedDuplicates())
             if (count > 0) {
                 _messageEvent.emit("$count Hörbuch(er) erfolgreich aus Ordner importiert")
-            } else if (_detectedDuplicates.value.isNotEmpty()) {
-                _messageEvent.emit("${_detectedDuplicates.value.size} identische(s) Duplikat(e) gefunden")
+            } else if (_maintenanceState.value.duplicates.isNotEmpty()) {
+                _messageEvent.emit("${_maintenanceState.value.duplicates.size} identische(s) Duplikat(e) gefunden")
             } else {
                 _messageEvent.emit("Keine neuen Hörbücher im ausgewählten Ordner gefunden.")
             }
@@ -358,7 +376,7 @@ class LibraryViewModel(
     fun deleteDuplicate(match: de.f_soft_studio.abookplayer.util.DuplicateMatch) {
         viewModelScope.launch {
             val success = storage.deleteDuplicateFromStorage(match)
-            _detectedDuplicates.value = storage.getDetectedDuplicates()
+            _maintenanceState.value = _maintenanceState.value.copy(duplicates = storage.getDetectedDuplicates())
             if (success) {
                 _messageEvent.emit("Doppelgänger auf dem Speicher gelöscht.")
             } else {
@@ -369,25 +387,31 @@ class LibraryViewModel(
 
     fun cleanupLibrary() {
         viewModelScope.launch {
-            val result = repository.cleanupDuplicatesAndOrphans(context)
-            val parts = mutableListOf<String>()
-            if (result.duplicatesRemoved > 0) parts.add("${result.duplicatesRemoved} doppelte(r)")
-            if (result.orphansRemoved > 0) parts.add("${result.orphansRemoved} verwaiste(r)")
-            if (result.zeroDurationFixed > 0) parts.add("${result.zeroDurationFixed} 0-min-Hörbuch(er) repariert")
+            _maintenanceState.value = _maintenanceState.value.copy(isCleaning = true)
+            try {
+                val result = repository.cleanupDuplicatesAndOrphans(context)
+                _maintenanceState.value = _maintenanceState.value.copy(cleanupResult = result)
 
-            val message = if (parts.isNotEmpty()) {
-                "Aufräumen beendet: ${parts.joinToString(", ")}."
-            } else {
-                "Bibliothek ist bereits sauber. Keine fehlerhaften Einträge."
+                val parts = mutableListOf<String>()
+                if (result.duplicatesRemoved > 0) parts.add("${result.duplicatesRemoved} doppelte(r)")
+                if (result.orphansRemoved > 0) parts.add("${result.orphansRemoved} verwaiste(r)")
+                if (result.zeroDurationFixed > 0) parts.add("${result.zeroDurationFixed} 0-min-Hörbuch(er) repariert")
+                val message = if (parts.isNotEmpty()) {
+                    "Aufräumen beendet: ${parts.joinToString(", ")}."
+                } else {
+                    "Bibliothek ist bereits sauber. Keine fehlerhaften Einträge."
+                }
+                _messageEvent.emit(message)
+            } finally {
+                _maintenanceState.value = _maintenanceState.value.copy(isCleaning = false)
             }
-            _messageEvent.emit(message)
         }
     }
 
     fun dismissDuplicate(match: de.f_soft_studio.abookplayer.util.DuplicateMatch) {
-        val current = _detectedDuplicates.value.toMutableList()
-        current.remove(match)
-        _detectedDuplicates.value = current
+        _maintenanceState.value = _maintenanceState.value.copy(
+            duplicates = _maintenanceState.value.duplicates.filterNot { it == match }
+        )
     }
 
     fun importAudiobook(audiobook: Audiobook) {

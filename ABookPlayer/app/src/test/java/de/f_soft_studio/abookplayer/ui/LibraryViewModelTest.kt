@@ -12,6 +12,7 @@ import de.f_soft_studio.abookplayer.ui.library.StatusFilter
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -272,6 +273,36 @@ class LibraryViewModelTest {
         val sorted = viewModel.audiobooks.first { it.size == 2 }
         assertEquals("Zuerst gespeichert", sorted[0].title) // größeres addedAt zuerst
         assertEquals("Danach gespeichert", sorted[1].title)
+    }
+
+    @Test
+    fun testScanUpdatesMaintenanceState() = runBlocking {
+        val gate = CompletableDeferred<Unit>()
+        val gatedStorage: AbookStorage = mockk(relaxed = true)
+        coEvery { gatedStorage.scanAndImport() } coAnswers {
+            gate.await()
+            emptyList()
+        }
+        val vm = LibraryViewModel(repository, gatedStorage)
+
+        assertEquals(false, vm.maintenanceState.value.isScanning)
+
+        vm.scanAudiobooks()
+        assertTrue("Scan sollte als laufend markiert sein", vm.maintenanceState.value.isScanning)
+
+        gate.complete(Unit)
+        val done = vm.maintenanceState.first { !it.isScanning }
+        assertEquals(false, done.isScanning)
+        assertTrue("lastScanMessage sollte gesetzt sein", !done.lastScanMessage.isNullOrBlank())
+    }
+
+    @Test
+    fun testDetectedDuplicatesStillExposedFromMaintenanceState() = runBlocking {
+        // Nach einem Scan ohne Duplikate ist die Liste leer und der Flow lieferbar.
+        viewModel.scanAudiobooks()
+        val dups = viewModel.detectedDuplicates.first()
+        assertTrue(dups.isEmpty())
+        assertEquals(dups, viewModel.maintenanceState.value.duplicates)
     }
 
     @Test

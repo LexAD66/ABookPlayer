@@ -22,6 +22,8 @@ class PlayerViewModel(
     val currentChapter: StateFlow<Chapter?> = playbackController.currentChapter
     val isVolumeBoostEnabled: StateFlow<Boolean> = playbackController.isVolumeBoostEnabled
     val isSkipSilenceEnabled: StateFlow<Boolean> = playbackController.isSkipSilenceEnabled
+    val audioPreset: StateFlow<de.f_soft_studio.abookplayer.player.controller.AudioPreset> = playbackController.loudnessController.currentPreset
+    val loudnessGainMb: StateFlow<Int> = playbackController.loudnessController.loudnessGainMb
 
     private var lastPauseTimeMs: Long = 0
 
@@ -43,6 +45,10 @@ class PlayerViewModel(
 
     fun skip10sForward() {
         playbackController.skip10SecondsForward()
+    }
+
+    fun skip30sForward() {
+        playbackController.skip30SecondsForward()
     }
 
     fun skip10sBackward() {
@@ -71,5 +77,13 @@ class PlayerViewModel(
 
     fun toggleSkipSilence() {
         playbackController.toggleSkipSilence()
+    }
+
+    fun setAudioPreset(preset: de.f_soft_studio.abookplayer.player.controller.AudioPreset) {
+        playbackController.loudnessController.setPreset(preset)
+    }
+
+    fun setLoudnessGainDb(gainDb: Int) {
+        playbackController.loudnessController.setLoudnessGainDb(gainDb)
     }
 }

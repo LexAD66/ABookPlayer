@@ -85,6 +85,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import de.f_soft_studio.abookplayer.util.CoverHelper
 import kotlinx.coroutines.delay
 import java.io.File
 import java.util.Locale
@@ -117,6 +118,9 @@ fun PlayerScreen(
     val currentChapter by viewModel.currentChapter.collectAsState()
     val playbackSpeed by viewModel.playbackSpeed.collectAsState()
     val isVolumeBoostEnabled by viewModel.isVolumeBoostEnabled.collectAsState()
+    val isSkipSilenceEnabled by viewModel.isSkipSilenceEnabled.collectAsState()
+    val audioPreset by viewModel.audioPreset.collectAsState()
+    val loudnessGainMb by viewModel.loudnessGainMb.collectAsState()
 
     var showSpeedMenu by remember { mutableStateOf(false) }
     var showCustomSpeedDialog by remember { mutableStateOf(false) }
@@ -132,9 +136,12 @@ fun PlayerScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             // Background Blur Cover or Dark Ambient Gradient
             val coverUri = audiobook?.coverUri
-            if (!coverUri.isNullOrBlank() && File(coverUri).exists()) {
+            val coverModel = remember(audiobook?.id, coverUri, audiobook?.filePath) {
+                CoverHelper.resolveCoverModel(coverUri, audiobook?.filePath)
+            }
+            if (coverModel != null) {
                 AsyncImage(
-                    model = File(coverUri),
+                    model = coverModel,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
@@ -298,6 +305,7 @@ fun PlayerScreen(
                         ) {
                             CoverArtWithGestures(
                                 coverUri = coverUri,
+                                filePath = audiobook?.filePath,
                                 title = audiobook?.title,
                                 isPlaying = isPlaying,
                                 onDoubleTap = { viewModel.togglePlayPause() },
@@ -484,6 +492,7 @@ fun PlayerScreen(
                         // Interactive Cover Art
                         CoverArtWithGestures(
                             coverUri = coverUri,
+                            filePath = audiobook?.filePath,
                             title = audiobook?.title,
                             isPlaying = isPlaying,
                             onDoubleTap = { viewModel.togglePlayPause() },
@@ -620,11 +629,11 @@ fun PlayerScreen(
                             }
 
                             IconButton(
-                                onClick = { viewModel.skip10sForward() },
+                                onClick = { viewModel.skip30sForward() },
                                 modifier = Modifier.size(48.dp)
                             ) {
                                 Text(
-                                    text = "+10s",
+                                    text = "+30s",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold
@@ -781,13 +790,14 @@ fun PlayerScreen(
 
         if (showEqualizerDialog) {
             EqualizerDialog(
-                currentProfile = currentAudioProfile,
-                onProfileSelected = { profile ->
-                    currentAudioProfile = profile
-                    if (profile != AudioProfile.STANDARD && !isVolumeBoostEnabled) {
-                        viewModel.toggleVolumeBoost()
-                    }
-                },
+                currentPreset = audioPreset,
+                loudnessGainDb = loudnessGainMb / 100,
+                isVolumeBoostEnabled = isVolumeBoostEnabled,
+                isSkipSilenceEnabled = isSkipSilenceEnabled,
+                onPresetSelected = { preset -> viewModel.setAudioPreset(preset) },
+                onLoudnessGainChanged = { gainDb -> viewModel.setLoudnessGainDb(gainDb) },
+                onVolumeBoostToggled = { viewModel.toggleVolumeBoost() },
+                onSkipSilenceToggled = { viewModel.toggleSkipSilence() },
                 onDismiss = { showEqualizerDialog = false }
             )
         }
@@ -797,6 +807,7 @@ fun PlayerScreen(
 @Composable
 private fun CoverArtWithGestures(
     coverUri: String?,
+    filePath: String? = null,
     title: String?,
     isPlaying: Boolean,
     onDoubleTap: () -> Unit,
@@ -806,6 +817,10 @@ private fun CoverArtWithGestures(
 ) {
     var totalDrag by remember { mutableStateOf(0f) }
     var feedbackText by remember { mutableStateOf<String?>(null) }
+
+    val coverModel = remember(coverUri, filePath) {
+        CoverHelper.resolveCoverModel(coverUri, filePath)
+    }
 
     LaunchedEffect(feedbackText) {
         if (feedbackText != null) {
@@ -847,9 +862,9 @@ private fun CoverArtWithGestures(
             },
         contentAlignment = Alignment.Center
     ) {
-        if (!coverUri.isNullOrBlank() && File(coverUri).exists()) {
+        if (coverModel != null) {
             AsyncImage(
-                model = File(coverUri),
+                model = coverModel,
                 contentDescription = title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

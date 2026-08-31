@@ -3,6 +3,8 @@ package de.f_soft_studio.abookplayer.player.controller
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.audiofx.LoudnessEnhancer
 import android.net.Uri
 import android.os.Build
@@ -13,7 +15,15 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.CommandButton
+import androidx.media3.session.LibraryResult
+import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import de.f_soft_studio.abookplayer.MainActivity
 import de.f_soft_studio.abookplayer.domain.model.Audiobook
 import de.f_soft_studio.abookplayer.domain.model.Chapter
@@ -112,8 +122,10 @@ class PlaybackController(
         }
     }
 
-    private var mediaSession: MediaSession? = null
-    private var loudnessEnhancer: LoudnessEnhancer? = null
+    private var mediaSession: MediaLibrarySession? = null
+    val loudnessController = LoudnessController()
+
+    private var shakeDetector: de.f_soft_studio.abookplayer.util.ShakeDetector? = null
 
     init {
         instance = this
@@ -124,11 +136,83 @@ class PlaybackController(
                 Intent(context, MainActivity::class.java),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
-            mediaSession = MediaSession.Builder(context, player)
+
+            val customCmdSkipBack = SessionCommand(AbookPlaybackService.ACTION_SKIP_10_BACKWARD, android.os.Bundle.EMPTY)
+            val customCmdSkipFwd = SessionCommand(AbookPlaybackService.ACTION_SKIP_10_FORWARD, android.os.Bundle.EMPTY)
+
+            val btnSkipBack = CommandButton.Builder()
+                .setDisplayName("-10s")
+                .setIconResId(android.R.drawable.ic_media_rew)
+                .setSessionCommand(customCmdSkipBack)
+                .build()
+
+            val btnSkipFwd = CommandButton.Builder()
+                .setDisplayName("+10s")
+                .setIconResId(android.R.drawable.ic_media_ff)
+                .setSessionCommand(customCmdSkipFwd)
+                .build()
+
+            val libraryCallback = object : MediaLibrarySession.Callback {
+                override fun onConnect(
+                    session: MediaSession,
+                    controller: MediaSession.ControllerInfo
+                ): MediaSession.ConnectionResult {
+                    val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+                        .add(customCmdSkipBack)
+                        .add(customCmdSkipFwd)
+                        .build()
+
+                    return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                        .setAvailableSessionCommands(sessionCommands)
+                        .setCustomLayout(listOf(btnSkipBack, btnSkipFwd))
+                        .build()
+                }
+
+                override fun onCustomCommand(
+                    session: MediaSession,
+                    controller: MediaSession.ControllerInfo,
+                    customCommand: SessionCommand,
+                    args: android.os.Bundle
+                ): ListenableFuture<SessionResult> {
+                    when (customCommand.customAction) {
+                        AbookPlaybackService.ACTION_SKIP_10_BACKWARD -> skip10SecondsBackward()
+                        AbookPlaybackService.ACTION_SKIP_10_FORWARD -> skip10SecondsForward()
+                    }
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
+            }
+
+            mediaSession = MediaLibrarySession.Builder(context, player, libraryCallback)
                 .setSessionActivity(sessionActivityIntent)
                 .build()
             activeMediaSession = mediaSession
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.e("PlaybackController", "Fehler beim Erstellen der MediaLibrarySession: ${e.message}", e)
+        }
+
+        shakeDetector = de.f_soft_studio.abookplayer.util.ShakeDetector(context) {
+            if (sleepTimerController.isActive.value && sleepTimerController.isShakeToResetEnabled.value) {
+                sleepTimerController.extendTimerMinutes(15)
+                try {
+                    val vibrator = context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        vibrator?.vibrate(android.os.VibrationEffect.createOneShot(200, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                    } else {
+                        @Suppress("DEPRECATION")
+                        vibrator?.vibrate(200)
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        shakeDetector?.startListening()
+
+        scope.launch {
+            sleepTimerController.volumeMultiplier.collect { mult ->
+                try {
+                    player.volume = mult
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     val sleepTimerController = SleepTimerController {
@@ -175,6 +259,25 @@ class PlaybackController(
 
     private var progressJob: Job? = null
 
+    private fun loadCoverBytes(coverFile: File?): ByteArray? {
+        if (coverFile == null || !coverFile.exists()) return null
+        return try {
+            val bitmap = BitmapFactory.decodeFile(coverFile.absolutePath) ?: return null
+            val maxDim = 512
+            val scaledBitmap = if (bitmap.width > maxDim || bitmap.height > maxDim) {
+                val aspect = bitmap.width.toFloat() / bitmap.height.toFloat()
+                val (targetW, targetH) = if (aspect >= 1f) maxDim to (maxDim / aspect).toInt() else (maxDim * aspect).toInt() to maxDim
+                Bitmap.createScaledBitmap(bitmap, targetW.coerceAtLeast(1), targetH.coerceAtLeast(1), true)
+            } else bitmap
+
+            val baos = java.io.ByteArrayOutputStream()
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 85, baos)
+            baos.toByteArray()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /**
      * Lädt ein Hörbuch und seine Kapitel-Playlist und startet optional sofort die Wiedergabe.
      */
@@ -182,6 +285,11 @@ class PlaybackController(
         _currentAudiobook.value = audiobook
         _chapters.value = chapterList
         lastPauseTimestamp = 0L
+
+        if (audiobook.customSpeed != null) {
+            _playbackSpeed.value = audiobook.customSpeed
+            applyPlaybackSpeed()
+        }
 
         var calculatedDuration = audiobook.duration
         if (calculatedDuration <= 0L && chapterList.isNotEmpty()) {
@@ -197,15 +305,52 @@ class PlaybackController(
         val distinctAudioPaths = chapterList.mapNotNull { it.audioPath?.ifBlank { null } }.distinct()
         val isMultiFile = distinctAudioPaths.size > 1
 
-        val coverFile = audiobook.coverUri?.let { File(it) }
-        val artworkUri = if (coverFile != null && coverFile.exists()) Uri.fromFile(coverFile) else null
+        val coverFile = audiobook.coverUri?.let {
+            val trimmed = it.trim()
+            if (trimmed.startsWith("file://")) File(trimmed.removePrefix("file://")) else File(trimmed)
+        }
+        val artworkUri = when {
+            audiobook.coverUri?.startsWith("content://") == true -> Uri.parse(audiobook.coverUri)
+            coverFile != null && coverFile.exists() -> Uri.fromFile(coverFile)
+            else -> null
+        }
+        val artworkBytes = de.f_soft_studio.abookplayer.util.CoverHelper.loadCoverBytes(audiobook.coverUri, audiobook.filePath)
 
-        val mediaMetadata = MediaMetadata.Builder()
-            .setTitle(audiobook.title)
-            .setArtist(audiobook.author.ifBlank { "ABook Player" })
-            .setArtworkUri(artworkUri)
-            .build()
+        fun createMetadata(ch: Chapter? = null): MediaMetadata {
+            val chTitle = ch?.title?.ifBlank { null }
+            val rawTitle = chTitle ?: audiobook.title
+            val displayTitle = if (rawTitle.endsWith(".mp3", ignoreCase = true) || rawTitle.endsWith(".m4b", ignoreCase = true)) {
+                audiobook.title
+            } else {
+                rawTitle
+            }
 
+            val builder = MediaMetadata.Builder()
+                .setTitle(displayTitle)
+                .setDisplayTitle(audiobook.title)
+                .setArtist(audiobook.author.ifBlank { "ABook Player" })
+                .setAlbumArtist(audiobook.author.ifBlank { "ABook Player" })
+                .setAlbumTitle(audiobook.title)
+                .setFolderType(MediaMetadata.FOLDER_TYPE_NONE)
+                .setIsPlayable(true)
+                .setIsBrowsable(false)
+
+            if (!chTitle.isNullOrBlank() && chTitle != audiobook.title && !chTitle.endsWith(".mp3", true) && !chTitle.endsWith(".m4b", true)) {
+                builder.setSubtitle("$chTitle • ${audiobook.author}")
+            } else if (audiobook.author.isNotBlank()) {
+                builder.setSubtitle(audiobook.author)
+            }
+
+            if (artworkBytes != null) {
+                builder.setArtworkData(artworkBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+            }
+            if (artworkUri != null) {
+                builder.setArtworkUri(artworkUri)
+            }
+            return builder.build()
+        }
+
+        val mediaMetadata = createMetadata()
         val mediaItems = mutableListOf<MediaItem>()
 
         if (isMultiFile) {
@@ -214,12 +359,7 @@ class PlaybackController(
                 if (!path.isNullOrBlank()) {
                     val file = File(path)
                     if (file.exists()) {
-                        val chMetadata = MediaMetadata.Builder()
-                            .setTitle(ch.title.ifBlank { audiobook.title })
-                            .setAlbumTitle(audiobook.title)
-                            .setArtist(audiobook.author.ifBlank { "ABook Player" })
-                            .setArtworkUri(artworkUri)
-                            .build()
+                        val chMetadata = createMetadata(ch)
                         mediaItems.add(
                             MediaItem.Builder()
                                 .setUri(Uri.fromFile(file))
@@ -369,6 +509,15 @@ class PlaybackController(
     }
 
     /**
+     * Springt 30 Sekunden vorwärts.
+     */
+    fun skip30SecondsForward() {
+        val currentPos = calculateGlobalPosition()
+        val newPos = (currentPos + 30000L).coerceAtMost(_duration.value.coerceAtLeast(0L))
+        seekTo(newPos)
+    }
+
+    /**
      * Springt 1 Minute (60 Sekunden) vorwärts.
      */
     fun skip60SecondsForward() {
@@ -449,6 +598,23 @@ class PlaybackController(
     fun setPlaybackSpeed(speed: Float) {
         _playbackSpeed.value = speed
         applyPlaybackSpeed()
+        _currentAudiobook.value?.let { book ->
+            val updated = book.copy(customSpeed = speed)
+            _currentAudiobook.value = updated
+            scope.launch {
+                try {
+                    val db = de.f_soft_studio.abookplayer.data.local.db.AbookDatabase.getInstance(context)
+                    val repo = de.f_soft_studio.abookplayer.data.repository.AudiobookRepository(
+                        audiobookDao = db.audiobookDao(),
+                        chapterDao = db.chapterDao(),
+                        bookmarkDao = db.bookmarkDao(),
+                        listeningSessionDao = db.listeningSessionDao(),
+                        characterDao = db.characterDao()
+                    )
+                    repo.saveAudiobook(updated)
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     /**
@@ -463,16 +629,8 @@ class PlaybackController(
         try {
             val audioSessionId = player.audioSessionId
             if (audioSessionId != C.AUDIO_SESSION_ID_UNSET && audioSessionId > 0) {
-                if (loudnessEnhancer == null || loudnessEnhancer?.id != audioSessionId) {
-                    loudnessEnhancer?.release()
-                    loudnessEnhancer = LoudnessEnhancer(audioSessionId)
-                }
-                if (_isVolumeBoostEnabled.value) {
-                    loudnessEnhancer?.setTargetGain(1000) // +10 dB Boost
-                    loudnessEnhancer?.enabled = true
-                } else {
-                    loudnessEnhancer?.enabled = false
-                }
+                loudnessController.attachAudioSession(audioSessionId)
+                loudnessController.setLoudnessEnabled(_isVolumeBoostEnabled.value)
             }
         } catch (_: Exception) {}
     }
@@ -559,6 +717,19 @@ class PlaybackController(
         scope.launch {
             try {
                 saveProgressUseCase(book.id, pos)
+                val webDavSyncManager = de.f_soft_studio.abookplayer.storage.sync.WebDavSyncManager(context)
+                if (webDavSyncManager.isConfigured && webDavSyncManager.isAutoSyncEnabled) {
+                    val db = de.f_soft_studio.abookplayer.data.local.db.AbookDatabase.getInstance(context)
+                    val repo = de.f_soft_studio.abookplayer.data.repository.AudiobookRepository(
+                        audiobookDao = db.audiobookDao(),
+                        chapterDao = db.chapterDao(),
+                        bookmarkDao = db.bookmarkDao(),
+                        listeningSessionDao = db.listeningSessionDao(),
+                        characterDao = db.characterDao()
+                    )
+                    val syncUseCase = de.f_soft_studio.abookplayer.domain.usecase.SyncProgressUseCase(repo, webDavSyncManager)
+                    syncUseCase()
+                }
             } catch (_: Exception) {}
         }
     }
@@ -600,9 +771,8 @@ class PlaybackController(
     fun release() {
         stopProgressTracker()
         try {
-            loudnessEnhancer?.release()
+            loudnessController.release()
         } catch (_: Exception) {}
-        loudnessEnhancer = null
         try {
             startPlaybackService(AbookPlaybackService.ACTION_STOP)
         } catch (_: Exception) {}

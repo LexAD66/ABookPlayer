@@ -81,8 +81,9 @@ class OpenLibraryScraper(
 
     private fun downloadCoverImage(imageUrl: String, targetFileName: String): String? {
         return try {
-            val coversDir = File(context.filesDir, "covers").apply { if (!exists()) mkdirs() }
+            val coversDir = LibraryLocationManager.getCoversDir(context)
             val targetFile = File(coversDir, targetFileName)
+
 
             val connection = (URL(imageUrl).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 8000

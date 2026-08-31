@@ -26,8 +26,12 @@ class FolderScanner(
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
     companion object {
-        private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "m4b", "ogg", "flac", "wav")
+        private val AUDIO_EXTENSIONS = setOf("mp3", "m4a", "m4b", "ogg", "flac", "wav", "aac", "opus")
         private val DISC_FOLDER_REGEX = Regex("""(?i)^(cd|disc|disk|teil|part)\s*[-_]?\s*\d+.*""")
+        private val IGNORE_DIRECTORIES = setOf(
+            "music", "dcim", "pictures", "movies", "ringtones", "notifications",
+            "alarms", "whatsapp", "telegram", "android", ".trash", ".abooklib"
+        )
 
         fun isAudioFile(file: File): Boolean {
             return file.isFile && AUDIO_EXTENSIONS.contains(file.extension.lowercase())
@@ -36,24 +40,42 @@ class FolderScanner(
         fun isDiscSubfolder(folder: File): Boolean {
             return folder.isDirectory && DISC_FOLDER_REGEX.matches(folder.name.trim())
         }
+
+        fun isIgnoredDirectory(dir: File): Boolean {
+            val name = dir.name.trim().lowercase()
+            return IGNORE_DIRECTORIES.contains(name) || name.startsWith(".") || name == LibraryLocationManager.ABOOK_LIB_FOLDER
+        }
     }
 
     /**
-     * Scannt ein Verzeichnis nach Hörbuchordnern.
+     * Scannt ein Verzeichnis rekursiv nach Hörbuchordnern.
      */
-    fun scanDirectory(baseDir: File): List<ScannedAudiobookResult> {
-        if (!baseDir.exists() || !baseDir.isDirectory) return emptyList()
+    fun scanDirectory(baseDir: File, maxDepth: Int = 4): List<ScannedAudiobookResult> {
+        if (!baseDir.exists() || !baseDir.isDirectory || isIgnoredDirectory(baseDir)) return emptyList()
 
         val results = mutableListOf<ScannedAudiobookResult>()
-        val subDirs = baseDir.listFiles { f -> f.isDirectory } ?: emptyArray()
-
-        for (dir in subDirs) {
-            val scanned = scanBookFolder(dir)
-            if (scanned != null) {
-                results.add(scanned)
-            }
-        }
+        scanDirectoryRecursive(baseDir, results, currentDepth = 0, maxDepth = maxDepth)
         return results
+    }
+
+    private fun scanDirectoryRecursive(
+        dir: File,
+        results: MutableList<ScannedAudiobookResult>,
+        currentDepth: Int,
+        maxDepth: Int
+    ) {
+        if (currentDepth > maxDepth || !dir.exists() || !dir.isDirectory || isIgnoredDirectory(dir)) return
+
+        val scanned = scanBookFolder(dir)
+        if (scanned != null) {
+            results.add(scanned)
+            return
+        }
+
+        val subDirs = dir.listFiles { f -> f.isDirectory && !isIgnoredDirectory(f) } ?: return
+        for (subDir in subDirs) {
+            scanDirectoryRecursive(subDir, results, currentDepth + 1, maxDepth)
+        }
     }
 
     /**
@@ -61,7 +83,7 @@ class FolderScanner(
      * Prüft, ob Unterordner wie CD1, CD2 vorliegen und fasst alle Audio-Dateien zusammen.
      */
     fun scanBookFolder(bookDir: File): ScannedAudiobookResult? {
-        if (!bookDir.exists() || !bookDir.isDirectory) return null
+        if (!bookDir.exists() || !bookDir.isDirectory || isIgnoredDirectory(bookDir)) return null
 
         val allAudioFiles = mutableListOf<File>()
 
@@ -108,6 +130,9 @@ class FolderScanner(
         var narrator: String? = null
         var description: String? = null
         var coverUri: String? = null
+        var series: String? = null
+        var parentSeries: String? = null
+        var seriesOrder: Int? = null
 
         val manifestFile = File(bookDir, "manifest.json")
         val metadataFile = File(bookDir, "metadata.json")
@@ -120,6 +145,9 @@ class FolderScanner(
                 author = manifest.author ?: ""
                 narrator = manifest.narrator
                 description = manifest.description
+                parentSeries = manifest.parentSeries
+                series = manifest.series
+                seriesOrder = manifest.seriesOrder
                 if (!manifest.cover.isNullOrBlank()) {
                     val cFile = File(bookDir, manifest.cover)
                     if (cFile.exists()) coverUri = cFile.absolutePath
@@ -139,32 +167,54 @@ class FolderScanner(
             }
         }
 
+        // Intelligente Reihen- und Serien-Erkennung aus der Ordnerhierarchie
+        if (series.isNullOrBlank()) {
+            val parentFolder = bookDir.parentFile
+            val grandParentFolder = parentFolder?.parentFile
+            if (parentFolder != null && !isIgnoredDirectory(parentFolder)) {
+                if (grandParentFolder != null && !isIgnoredDirectory(grandParentFolder)) {
+                    // Beispiel: Audiobooks/Perry Rhodan/Atlantis/01 - ...
+                    parentSeries = grandParentFolder.name
+                    series = parentFolder.name
+                } else {
+                    series = parentFolder.name
+                }
+            }
+        }
+        if (seriesOrder == null) {
+            seriesOrder = extractNumber(bookDir.name)?.first
+        }
+
         if (coverUri == null) {
-            val imageFiles = directSubFiles.filter { f ->
+            val allFiles = bookDir.walkTopDown().maxDepth(4).toList()
+            val imageFiles = allFiles.filter { f ->
                 f.isFile && (f.extension.lowercase() in setOf("jpg", "jpeg", "png", "webp"))
             }
             val coverCandidate = imageFiles.firstOrNull { f ->
                 val name = f.nameWithoutExtension.lowercase()
-                name.startsWith("cover") || name.startsWith("folder") || name.startsWith("front")
+                name.startsWith("cover") || name.startsWith("folder") || name.startsWith("front") || name.startsWith("album") || name.startsWith("art")
             } ?: imageFiles.firstOrNull()
             coverUri = coverCandidate?.absolutePath
         }
 
         if (coverUri == null && allAudioFiles.isNotEmpty()) {
-            try {
-                val firstAudio = allAudioFiles.first()
-                val retriever = android.media.MediaMetadataRetriever()
-                retriever.setDataSource(firstAudio.absolutePath)
-                val art = retriever.embeddedPicture
-                retriever.release()
-                if (art != null && art.isNotEmpty()) {
-                    val coversDir = File(context.filesDir, "covers").apply { if (!exists()) mkdirs() }
-                    val targetFile = File(coversDir, "cover_embedded_${bookDir.name.hashCode()}.jpg")
-                    targetFile.writeBytes(art)
-                    coverUri = targetFile.absolutePath
-                }
-            } catch (_: Exception) {}
+            for (audioFile in allAudioFiles.take(10)) {
+                try {
+                    val retriever = android.media.MediaMetadataRetriever()
+                    retriever.setDataSource(audioFile.absolutePath)
+                    val art = retriever.embeddedPicture
+                    retriever.release()
+                    if (art != null && art.isNotEmpty()) {
+                        val coversDir = LibraryLocationManager.getCoversDir(context)
+                        val targetFile = File(coversDir, "cover_embedded_${bookDir.name.hashCode()}.jpg")
+                        targetFile.writeBytes(art)
+                        coverUri = targetFile.absolutePath
+                        break
+                    }
+                } catch (_: Exception) {}
+            }
         }
+
 
         var cumulativeTimeMs = 0L
         val chapters = mutableListOf<Chapter>()
@@ -199,10 +249,15 @@ class FolderScanner(
             description = description,
             duration = cumulativeTimeMs,
             currentPosition = 0L,
-            lastPlayed = System.currentTimeMillis()
+            lastPlayed = System.currentTimeMillis(),
+            parentSeries = parentSeries,
+            series = series,
+            seriesOrder = seriesOrder,
+            isFavorite = false
         )
 
         return ScannedAudiobookResult(audiobook, chapters)
+
     }
 
     private fun naturalCompare(s1: String, s2: String): Int {

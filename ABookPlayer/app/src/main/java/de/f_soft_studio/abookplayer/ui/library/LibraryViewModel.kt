@@ -298,13 +298,6 @@ class LibraryViewModel(
         initialValue = emptyList()
     )
 
-    init {
-        scanAudiobooks()
-        viewModelScope.launch {
-            repository.recalculateZeroDurationBooks(context)
-        }
-    }
-
     fun onSearchQueryChanged(query: String) {
         _searchQuery.value = query
     }

@@ -10,6 +10,7 @@ import de.f_soft_studio.abookplayer.ui.library.LibraryViewModel
 import de.f_soft_studio.abookplayer.ui.library.SortOrder
 import de.f_soft_studio.abookplayer.ui.library.StatusFilter
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -271,6 +272,15 @@ class LibraryViewModelTest {
         val sorted = viewModel.audiobooks.first { it.size == 2 }
         assertEquals("Zuerst gespeichert", sorted[0].title) // größeres addedAt zuerst
         assertEquals("Danach gespeichert", sorted[1].title)
+    }
+
+    @Test
+    fun testInitDoesNotTriggerAutomaticScan() = runBlocking {
+        // frisches ViewModel mit eigenem Mock, um Aufrufe isoliert zu prüfen
+        val freshStorage: AbookStorage = mockk(relaxed = true)
+        LibraryViewModel(repository, freshStorage)
+
+        coVerify(exactly = 0) { freshStorage.scanAndImport() }
     }
 }
 

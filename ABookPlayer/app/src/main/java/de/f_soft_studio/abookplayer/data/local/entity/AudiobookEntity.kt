@@ -20,6 +20,7 @@ data class AudiobookEntity(
     val duration: Long,
     val currentPosition: Long,
     val lastPlayed: Long,
+    // 0L nur als Spalten-Default (siehe MIGRATION_9_10); echte Werte kommen aus Domain-Modell/Migration
     val addedAt: Long = 0L,
     val parentSeries: String? = null,
     val series: String? = null,

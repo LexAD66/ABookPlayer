@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import de.f_soft_studio.abookplayer.data.repository.AudiobookRepository
 import de.f_soft_studio.abookplayer.domain.model.Audiobook
 import de.f_soft_studio.abookplayer.storage.AbookStorage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -320,6 +321,7 @@ class LibraryViewModel(
             .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     fun scanAudiobooks() {
+        if (_maintenanceState.value.isScanning) return
         viewModelScope.launch {
             _maintenanceState.value = _maintenanceState.value.copy(isScanning = true)
             try {
@@ -336,6 +338,8 @@ class LibraryViewModel(
                     lastScanMessage = message
                 )
                 _messageEvent.emit(message)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 val message = "Scan fehlgeschlagen: ${e.message ?: "unbekannter Fehler"}"
                 _maintenanceState.value = _maintenanceState.value.copy(lastScanMessage = message)
@@ -386,6 +390,7 @@ class LibraryViewModel(
     }
 
     fun cleanupLibrary() {
+        if (_maintenanceState.value.isCleaning) return
         viewModelScope.launch {
             _maintenanceState.value = _maintenanceState.value.copy(isCleaning = true)
             try {
@@ -402,6 +407,10 @@ class LibraryViewModel(
                     "Bibliothek ist bereits sauber. Keine fehlerhaften Einträge."
                 }
                 _messageEvent.emit(message)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _messageEvent.emit("Aufräumen fehlgeschlagen: ${e.message ?: "unbekannter Fehler"}")
             } finally {
                 _maintenanceState.value = _maintenanceState.value.copy(isCleaning = false)
             }

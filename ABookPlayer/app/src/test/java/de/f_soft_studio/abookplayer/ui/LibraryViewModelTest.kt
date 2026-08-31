@@ -306,6 +306,28 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun testDetectedDuplicatesPropagatedFromStorageAfterScan() = runBlocking {
+        // Frischer Mock, damit getDetectedDuplicates() eine echte Liste liefert.
+        val dupStorage: AbookStorage = mockk(relaxed = true)
+        val match = de.f_soft_studio.abookplayer.util.DuplicateMatch(
+            existingAudiobook = Audiobook(title = "Der Alchemist", author = "Paulo Coelho", filePath = "/lib/alchemist"),
+            candidateTitle = "Der Alchemist",
+            candidatePath = "/scan/alchemist",
+            comparisonType = de.f_soft_studio.abookplayer.util.ComparisonType.IDENTICAL_DUPLICATE,
+            durationDifferenceMs = 0L
+        )
+        val expected = listOf(match)
+        coEvery { dupStorage.scanAndImport() } returns emptyList()
+        coEvery { dupStorage.getDetectedDuplicates() } returns expected
+
+        val vm = LibraryViewModel(repository, dupStorage)
+        vm.scanAudiobooks()
+
+        assertEquals(expected, vm.detectedDuplicates.first { it.isNotEmpty() })
+        assertEquals(expected, vm.maintenanceState.value.duplicates)
+    }
+
+    @Test
     fun testInitDoesNotTriggerAutomaticScan() = runBlocking {
         // frisches ViewModel mit eigenem Mock, um Aufrufe isoliert zu prüfen
         val freshStorage: AbookStorage = mockk(relaxed = true)

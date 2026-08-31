@@ -39,8 +39,12 @@ fun SleepTimerDialog(
     isActive: Boolean,
     remainingTimeMs: Long,
     stopAtEndOfChapter: Boolean = false,
+    isShakeToResetEnabled: Boolean = true,
+    isFadeOutEnabled: Boolean = true,
     onSelectMinutes: (Int) -> Unit,
     onSelectEndOfChapter: (() -> Unit)? = null,
+    onToggleShakeToReset: ((Boolean) -> Unit)? = null,
+    onToggleFadeOut: ((Boolean) -> Unit)? = null,
     onCancelTimer: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -100,6 +104,64 @@ fun SleepTimerDialog(
                         activeTrackColor = MaterialTheme.colorScheme.primary
                     )
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                var localShake by remember { androidx.compose.runtime.mutableStateOf(isShakeToResetEnabled) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "📳 Schütteln zum Verlängern",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "+15 Min bei Bewegung",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    androidx.compose.material3.Switch(
+                        checked = localShake,
+                        onCheckedChange = {
+                            localShake = it
+                            onToggleShakeToReset?.invoke(it)
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                var localFade by remember { androidx.compose.runtime.mutableStateOf(isFadeOutEnabled) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "🔉 Sanftes Ausblenden (Fade-Out)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Blendet in letzten 30s aus",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    androidx.compose.material3.Switch(
+                        checked = localFade,
+                        onCheckedChange = {
+                            localFade = it
+                            onToggleFadeOut?.invoke(it)
+                        }
+                    )
+                }
             }
         },
         confirmButton = {

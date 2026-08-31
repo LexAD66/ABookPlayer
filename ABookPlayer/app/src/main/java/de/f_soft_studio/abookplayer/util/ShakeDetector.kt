@@ -1,37 +1,36 @@
 package de.f_soft_studio.abookplayer.util
 
+import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.util.Log
 import kotlin.math.sqrt
 
 /**
- * Leichtgewichtiger Schüttel-Detektor für den Beschleunigungssensor (Accelerometer).
- * Löst ein [onShake] Event aus, wenn eine Schüttel-Bewegung erkannt wird.
+ * ShakeDetector: Erkennt sanftes Schütteln des Smartphones über den Beschleunigungssensor.
  */
 class ShakeDetector(
+    context: Context,
     private val onShake: () -> Unit
 ) : SensorEventListener {
 
-    companion object {
-        private const val SHAKE_THRESHOLD_GRAVITY = 2.5f
-        private const val SHAKE_SLOP_TIME_MS = 1500L
-    }
+    private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+    private val accelerometer: Sensor? = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
 
-    private var lastShakeTimestamp = 0L
+    private var lastShakeTime = 0L
+    private val shakeCooldownMs = 1500L
+    private val shakeThresholdG = 2.0f
 
-    fun register(sensorManager: SensorManager): Boolean {
-        val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        return if (accelerometer != null) {
-            sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_UI)
-        } else {
-            false
+    fun startListening() {
+        accelerometer?.let {
+            sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
         }
     }
 
-    fun unregister(sensorManager: SensorManager) {
-        sensorManager.unregisterListener(this)
+    fun stopListening() {
+        sensorManager?.unregisterListener(this)
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
@@ -47,10 +46,11 @@ class ShakeDetector(
 
         val gForce = sqrt(gX * gX + gY * gY + gZ * gZ)
 
-        if (gForce > SHAKE_THRESHOLD_GRAVITY) {
+        if (gForce > shakeThresholdG) {
             val now = System.currentTimeMillis()
-            if (lastShakeTimestamp + SHAKE_SLOP_TIME_MS < now) {
-                lastShakeTimestamp = now
+            if (now - lastShakeTime > shakeCooldownMs) {
+                lastShakeTime = now
+                Log.d("ShakeDetector", "Schüttel-Geste erkannt! (gForce: $gForce)")
                 onShake()
             }
         }

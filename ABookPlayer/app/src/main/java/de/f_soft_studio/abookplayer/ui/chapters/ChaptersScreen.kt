@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -48,6 +49,7 @@ fun ChaptersScreen(
     chapters: List<Chapter>,
     currentChapterId: Long?,
     onChapterSelected: (Chapter) -> Unit,
+    onEditChaptersRequested: (() -> Unit)? = null,
     onBackClick: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -68,6 +70,17 @@ fun ChaptersScreen(
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                    }
+                },
+                actions = {
+                    if (onEditChaptersRequested != null) {
+                        IconButton(onClick = onEditChaptersRequested) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Default.Edit,
+                                contentDescription = "Kapitel bearbeiten",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

@@ -42,6 +42,7 @@ fun EditMetadataDialog(
 ) {
     var title by remember { mutableStateOf(audiobook.title) }
     var author by remember { mutableStateOf(audiobook.author) }
+    var parentSeries by remember { mutableStateOf(audiobook.parentSeries ?: "") }
     var series by remember { mutableStateOf(audiobook.series ?: "") }
     var seriesOrderText by remember { mutableStateOf(audiobook.seriesOrder?.toString() ?: "") }
     var description by remember { mutableStateOf(audiobook.description ?: "") }
@@ -86,6 +87,14 @@ fun EditMetadataDialog(
                     singleLine = true
                 )
 
+                OutlinedTextField(
+                    value = parentSeries,
+                    onValueChange = { parentSeries = it },
+                    label = { Text("Übergeordnete Reihe / Universum (z. B. Perry Rhodan)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -93,7 +102,7 @@ fun EditMetadataDialog(
                     OutlinedTextField(
                         value = series,
                         onValueChange = { series = it },
-                        label = { Text("Serien-Name") },
+                        label = { Text("Serie / Zyklus (z. B. Atlantis)") },
                         modifier = Modifier.weight(0.65f),
                         singleLine = true
                     )
@@ -124,13 +133,15 @@ fun EditMetadataDialog(
                     val updated = audiobook.copy(
                         title = title.ifBlank { audiobook.title },
                         author = author,
-                        series = series.ifBlank { null },
+                        parentSeries = parentSeries.trim().ifBlank { null },
+                        series = series.trim().ifBlank { null },
                         seriesOrder = order,
                         description = description.ifBlank { null }
                     )
                     onSave(updated)
                     onDismiss()
                 },
+
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary
                 )

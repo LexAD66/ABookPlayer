@@ -20,8 +20,12 @@ data class AudiobookEntity(
     val duration: Long,
     val currentPosition: Long,
     val lastPlayed: Long,
+    val parentSeries: String? = null,
     val series: String? = null,
-    val seriesOrder: Int? = null
+    val seriesOrder: Int? = null,
+    val isFavorite: Boolean = false,
+    val customSpeed: Float? = null,
+    val equalizerPreset: String? = null
 )
 
 /**
@@ -39,8 +43,12 @@ fun AudiobookEntity.toDomainModel(): Audiobook {
         duration = duration,
         currentPosition = currentPosition,
         lastPlayed = lastPlayed,
+        parentSeries = parentSeries,
         series = series,
-        seriesOrder = seriesOrder
+        seriesOrder = seriesOrder,
+        isFavorite = isFavorite,
+        customSpeed = customSpeed,
+        equalizerPreset = equalizerPreset
     )
 }
 
@@ -59,7 +67,12 @@ fun Audiobook.toEntity(): AudiobookEntity {
         duration = duration,
         currentPosition = currentPosition,
         lastPlayed = lastPlayed,
+        parentSeries = parentSeries,
         series = series,
-        seriesOrder = seriesOrder
+        seriesOrder = seriesOrder,
+        isFavorite = isFavorite,
+        customSpeed = customSpeed,
+        equalizerPreset = equalizerPreset
     )
 }
+

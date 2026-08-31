@@ -39,8 +39,15 @@ interface AudiobookDao {
     @Query("UPDATE audiobooks SET coverUri = :coverUri, description = COALESCE(:description, description) WHERE id = :id")
     suspend fun updateCoverAndDescription(id: Long, coverUri: String?, description: String?)
 
+    @Query("UPDATE audiobooks SET isFavorite = :isFavorite WHERE id = :id")
+    suspend fun updateFavorite(id: Long, isFavorite: Boolean)
+
+    @Query("UPDATE audiobooks SET parentSeries = :parentSeries, series = :series, seriesOrder = :seriesOrder WHERE id = :id")
+    suspend fun updateSeriesAndParentSeriesInfo(id: Long, parentSeries: String?, series: String?, seriesOrder: Int?)
+
     @Query("UPDATE audiobooks SET series = :series, seriesOrder = :seriesOrder WHERE id = :id")
     suspend fun updateSeriesInfo(id: Long, series: String?, seriesOrder: Int?)
+
 
     @Delete
     suspend fun deleteAudiobook(audiobook: AudiobookEntity)

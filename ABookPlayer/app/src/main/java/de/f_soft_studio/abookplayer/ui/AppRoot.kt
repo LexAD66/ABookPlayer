@@ -16,6 +16,7 @@ import de.f_soft_studio.abookplayer.player.controller.PlaybackController
 import de.f_soft_studio.abookplayer.storage.AbookStorage
 import de.f_soft_studio.abookplayer.ui.bookmarks.BookmarksScreen
 import de.f_soft_studio.abookplayer.ui.chapters.ChaptersScreen
+import de.f_soft_studio.abookplayer.ui.info.EbookInfoScreen
 import de.f_soft_studio.abookplayer.ui.library.LibraryScreen
 import de.f_soft_studio.abookplayer.ui.library.LibraryViewModel
 import de.f_soft_studio.abookplayer.ui.player.PlayerScreen
@@ -49,13 +50,15 @@ fun AppRoot(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    val libraryViewModel = remember { LibraryViewModel(repository, storage) }
+    val libraryViewModel = remember { LibraryViewModel(repository, storage, context) }
     val playerViewModel = remember { PlayerViewModel(playbackController) }
     val statisticsViewModel = remember {
         StatisticsViewModel(GetListeningStatisticsUseCase(repository))
     }
-    val settingsViewModel = remember { de.f_soft_studio.abookplayer.ui.settings.SettingsViewModel(context) }
+    val settingsViewModel = remember { de.f_soft_studio.abookplayer.ui.settings.SettingsViewModel(context, storage) }
+    val charactersViewModel = remember { de.f_soft_studio.abookplayer.ui.characters.CharactersViewModel(repository) }
     val appThemeMode by settingsViewModel.appThemeMode.collectAsState()
+
 
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var selectedBookForDetails by remember { mutableStateOf<Audiobook?>(null) }
@@ -117,6 +120,7 @@ fun AppRoot(
         composable("settings") {
             de.f_soft_studio.abookplayer.ui.settings.SettingsScreen(
                 viewModel = settingsViewModel,
+                repository = repository,
                 onBackClick = { navController.popBackStack() }
             )
         }
@@ -135,6 +139,7 @@ fun AppRoot(
             }
             val detailsChapters = detailsChaptersState?.value ?: emptyList()
             var exportState by remember { mutableStateOf<ExportState>(ExportState.Idle) }
+            var isSearchingOnline by remember { mutableStateOf(false) }
 
             var showEditDialog by remember { mutableStateOf(false) }
 
@@ -142,6 +147,7 @@ fun AppRoot(
                 audiobook = book,
                 chapters = detailsChapters,
                 exportState = exportState,
+                isSearchingOnline = isSearchingOnline,
                 onPlayClick = {
                     book?.let { b ->
                         scope.launch {
@@ -167,22 +173,42 @@ fun AppRoot(
                     }
                 },
                 onSearchCoverOnline = {
-                    if (book != null) {
+                    if (book != null && !isSearchingOnline) {
+                        isSearchingOnline = true
                         scope.launch {
-                            val scraper = de.f_soft_studio.abookplayer.storage.OpenLibraryScraper(context)
-                            val result = scraper.searchMetadataAndCover(book.title, book.author)
-                            if (result != null && (!result.coverPath.isNullOrBlank() || !result.description.isNullOrBlank())) {
-                                repository.updateCoverAndDescription(book.id, result.coverPath, result.description)
-                                val updated = repository.getAudiobookById(book.id)
-                                if (updated != null) {
-                                    selectedBookForDetails = updated
+                            try {
+                                val scraper = de.f_soft_studio.abookplayer.storage.OnlineCoverScraper(context)
+                                val result = scraper.searchCoverAndMetadata(book.title, book.author)
+                                if (result != null && (!result.coverPath.isNullOrBlank() || !result.description.isNullOrBlank())) {
+                                    repository.updateCoverAndDescription(book.id, result.coverPath, result.description)
+                                    val updated = repository.getAudiobookById(book.id)
+                                    if (updated != null) {
+                                        selectedBookForDetails = updated
+                                    }
+                                    android.widget.Toast.makeText(context, "Cover & Info via ${result.providerName} gefunden!", android.widget.Toast.LENGTH_SHORT).show()
+                                } else {
+                                    android.widget.Toast.makeText(context, "Kein Cover online gefunden.", android.widget.Toast.LENGTH_SHORT).show()
                                 }
+                            } catch (e: Exception) {
+                                android.widget.Toast.makeText(context, "Fehler bei der Online-Suche: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                            } finally {
+                                isSearchingOnline = false
                             }
                         }
                     }
                 },
                 onEditClick = { showEditDialog = true },
+                onOpenCharacters = {
+                    if (book != null) {
+                        navController.navigate("characters/${book.id}")
+                    }
+                },
+                onOpenInfo = { b ->
+                    selectedBookForDetails = b
+                    navController.navigate("info")
+                },
                 onUpdateMetadata = { updatedBook ->
+
                     scope.launch {
                         repository.saveAudiobook(updatedBook)
                         selectedBookForDetails = updatedBook
@@ -195,15 +221,16 @@ fun AppRoot(
                 de.f_soft_studio.abookplayer.ui.details.EditAudiobookDialog(
                     audiobook = book,
                     onDismiss = { showEditDialog = false },
-                    onConfirm = { title, author, narrator, series, seriesOrder ->
+                    onConfirm = { title, author, narrator, parentSeries, series, seriesOrder ->
                         showEditDialog = false
                         scope.launch {
                             val updatedBook = book.copy(
-                                title = title,
-                                author = author,
-                                narrator = narrator,
-                                series = series,
-                                seriesOrder = seriesOrder
+                                 title = title,
+                                 author = author,
+                                 narrator = narrator,
+                                 parentSeries = parentSeries,
+                                 series = series,
+                                 seriesOrder = seriesOrder
                             )
                             repository.saveAudiobook(updatedBook)
                             selectedBookForDetails = updatedBook
@@ -211,6 +238,39 @@ fun AppRoot(
                     }
                 )
             }
+
+        }
+
+        composable("info") {
+            val book = selectedBookForDetails
+            EbookInfoScreen(
+                audiobook = book,
+                onBackClick = { navController.popBackStack() },
+                onSearchOnline = { b ->
+                    scope.launch {
+                        try {
+                            val scraper = de.f_soft_studio.abookplayer.storage.OnlineCoverScraper(context)
+                            val result = scraper.searchCoverAndMetadata(b.title, b.author)
+                            if (result != null && (!result.coverPath.isNullOrBlank() || !result.description.isNullOrBlank())) {
+                                repository.updateCoverAndDescription(b.id, result.coverPath, result.description)
+                                val updated = repository.getAudiobookById(b.id)
+                                if (updated != null) {
+                                    selectedBookForDetails = updated
+                                }
+                                android.widget.Toast.makeText(context, "Cover & Info via ${result.providerName} gefunden!", android.widget.Toast.LENGTH_SHORT).show()
+                            } else {
+                                android.widget.Toast.makeText(context, "Kein Cover online gefunden.", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, "Fehler bei der Online-Suche: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+                onEditMetadata = { b ->
+                    selectedBookForDetails = b
+                    navController.navigate("details")
+                }
+            )
         }
 
         composable("player") {
@@ -232,6 +292,8 @@ fun AppRoot(
         }
 
         composable("chapters") {
+            var showEditChaptersDialog by remember { mutableStateOf(false) }
+
             ChaptersScreen(
                 chapters = chapters,
                 currentChapterId = currentChapter?.id,
@@ -239,8 +301,26 @@ fun AppRoot(
                     playerViewModel.seekTo(ch.startTime)
                     navController.popBackStack()
                 },
+                onEditChaptersRequested = { showEditChaptersDialog = true },
                 onBackClick = { navController.popBackStack() }
             )
+
+            if (showEditChaptersDialog && currentAudiobook != null) {
+                de.f_soft_studio.abookplayer.ui.chapters.EditChaptersDialog(
+                    audiobookId = currentAudiobook!!.id,
+                    initialChapters = chapters,
+                    onDismiss = { showEditChaptersDialog = false },
+                    onConfirm = { updatedChapters ->
+                        showEditChaptersDialog = false
+                        scope.launch {
+                            repository.saveChapters(updatedChapters)
+                            currentAudiobook?.let { book ->
+                                playbackController.loadAudiobook(book, updatedChapters, autoPlay = false)
+                            }
+                        }
+                    }
+                )
+            }
         }
 
         composable("bookmarks") {
@@ -276,12 +356,29 @@ fun AppRoot(
                 onBackClick = { navController.popBackStack() }
             )
         }
+
+        composable("characters/{audiobookId}") { backStackEntry ->
+            val bookIdStr = backStackEntry.arguments?.getString("audiobookId")
+            val bookId = bookIdStr?.toLongOrNull() ?: 0L
+            de.f_soft_studio.abookplayer.ui.characters.CharactersScreen(
+                viewModel = charactersViewModel,
+                audiobookId = bookId,
+                onBackClick = { navController.popBackStack() }
+            )
+        }
     }
 
+
     if (showSleepTimerDialog) {
+        val isShakeEnabled by playbackController.sleepTimerController.isShakeToResetEnabled.collectAsState()
+        val isFadeEnabled by playbackController.sleepTimerController.isFadeOutEnabled.collectAsState()
         SleepTimerDialog(
             isActive = isTimerActive,
             remainingTimeMs = remainingTimerMs,
+            isShakeToResetEnabled = isShakeEnabled,
+            isFadeOutEnabled = isFadeEnabled,
+            onToggleShakeToReset = { playbackController.sleepTimerController.setShakeToResetEnabled(it) },
+            onToggleFadeOut = { playbackController.sleepTimerController.setFadeOutEnabled(it) },
             onSelectMinutes = { mins ->
                 playbackController.sleepTimerController.startTimerMinutes(mins)
                 currentAudiobook?.let { book ->

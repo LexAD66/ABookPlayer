@@ -161,7 +161,7 @@ class LibraryViewModelTest {
         viewModel.toggleBookSelection(id2)
         viewModel.toggleFavoriteForSelected()
 
-        val favoriteIds = viewModel.favoriteBookIds.value
+        val favoriteIds = viewModel.favoriteBookIds.first { it.contains(id1) && it.contains(id2) }
         assertTrue(favoriteIds.contains(id1))
         assertTrue(favoriteIds.contains(id2))
 
@@ -169,9 +169,10 @@ class LibraryViewModelTest {
         viewModel.toggleBookSelection(id2)
         viewModel.deleteSelectedAudiobooks()
 
-        val booksAfterDelete = viewModel.audiobooks.first()
+        val booksAfterDelete = viewModel.audiobooks.first { it.isEmpty() }
         assertTrue(booksAfterDelete.isEmpty())
     }
+
 
     @Test
     fun testSeriesStackGrouping() = runBlocking {
@@ -200,4 +201,41 @@ class LibraryViewModelTest {
         viewModel.closeSeries()
         assertEquals(null, viewModel.expandedSeries.value)
     }
+
+    @Test
+    fun testTwoLevelSeriesHierarchyPerryRhodanAtlantis() = runBlocking {
+        repository.saveAudiobook(
+            Audiobook(
+                title = "Das dunkle Reich",
+                author = "K. H. Scheer",
+                parentSeries = "Perry Rhodan",
+                series = "Atlantis",
+                seriesOrder = 1,
+                filePath = "/path/pr1"
+            )
+        )
+        repository.saveAudiobook(
+            Audiobook(
+                title = "Die Kristallwelt",
+                author = "Clark Darlton",
+                parentSeries = "Perry Rhodan",
+                series = "Atlantis",
+                seriesOrder = 2,
+                filePath = "/path/pr2"
+            )
+        )
+
+        viewModel.onSortOrderChanged(SortOrder.SERIEN)
+
+        val items = viewModel.libraryItems.first { it.isNotEmpty() }
+        assertEquals(1, items.size)
+
+        val seriesItem = items.first() as de.f_soft_studio.abookplayer.ui.library.LibraryItem.Series
+        assertEquals("Perry Rhodan - Atlantis", seriesItem.stack.seriesName)
+        assertEquals("Perry Rhodan", seriesItem.stack.parentSeries)
+        assertEquals(2, seriesItem.stack.books.size)
+        assertEquals(1, seriesItem.stack.books[0].seriesOrder)
+        assertEquals(2, seriesItem.stack.books[1].seriesOrder)
+    }
 }
+

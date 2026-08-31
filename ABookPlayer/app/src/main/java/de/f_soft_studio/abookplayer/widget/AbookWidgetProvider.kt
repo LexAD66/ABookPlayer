@@ -94,8 +94,9 @@ class AbookWidgetProvider : AppWidgetProvider() {
             val duration = controller.duration.value
 
             // Geblürtes Cover-Hintergrundbild setzen (mit Fallback auf eingebettetes Cover)
-            val blurredBitmap = loadAndBlurCover(audiobook, 6)
+            val blurredBitmap = loadAndBlurCover(audiobook, 3)
             if (blurredBitmap != null) {
+
                 views.setImageViewBitmap(R.id.widget_bg_image, blurredBitmap)
             } else {
                 views.setImageViewResource(R.id.widget_bg_image, 0)
@@ -224,8 +225,9 @@ class AbookWidgetProvider : AppWidgetProvider() {
 
                 // Downscale for smooth high-performance blur
                 val small = Bitmap.createScaledBitmap(original, 100, 100, true)
-                val blurred = fastBoxBlur(small, radius = radius.coerceIn(4, 10))
+                val blurred = fastBoxBlur(small, radius = radius.coerceIn(1, 10))
                 Bitmap.createScaledBitmap(blurred, 300, 300, true)
+
             } catch (_: Exception) {
                 null
             }

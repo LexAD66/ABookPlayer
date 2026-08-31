@@ -40,8 +40,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.runtime.remember
 import coil.compose.AsyncImage
 import de.f_soft_studio.abookplayer.domain.model.Audiobook
+import de.f_soft_studio.abookplayer.util.CoverHelper
 import java.io.File
 
 /**
@@ -151,10 +153,12 @@ private fun SeriesBookItemCard(
                 .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val coverUri = book.coverUri
-            if (!coverUri.isNullOrBlank() && File(coverUri).exists()) {
+            val coverModel = remember(book.id, book.coverUri, book.filePath) {
+                CoverHelper.resolveCoverModel(book.coverUri, book.filePath)
+            }
+            if (coverModel != null) {
                 AsyncImage(
-                    model = File(coverUri),
+                    model = coverModel,
                     contentDescription = book.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier

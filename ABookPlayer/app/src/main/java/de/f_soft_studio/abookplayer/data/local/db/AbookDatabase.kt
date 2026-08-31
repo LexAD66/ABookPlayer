@@ -9,10 +9,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import de.f_soft_studio.abookplayer.data.local.dao.AudiobookDao
 import de.f_soft_studio.abookplayer.data.local.dao.BookmarkDao
 import de.f_soft_studio.abookplayer.data.local.dao.ChapterDao
+import de.f_soft_studio.abookplayer.data.local.dao.CharacterDao
 import de.f_soft_studio.abookplayer.data.local.dao.ListeningSessionDao
 import de.f_soft_studio.abookplayer.data.local.entity.AudiobookEntity
 import de.f_soft_studio.abookplayer.data.local.entity.BookmarkEntity
 import de.f_soft_studio.abookplayer.data.local.entity.ChapterEntity
+import de.f_soft_studio.abookplayer.data.local.entity.CharacterEntity
 import de.f_soft_studio.abookplayer.data.local.entity.ListeningSessionEntity
 
 /**
@@ -23,9 +25,10 @@ import de.f_soft_studio.abookplayer.data.local.entity.ListeningSessionEntity
         AudiobookEntity::class,
         ChapterEntity::class,
         BookmarkEntity::class,
-        ListeningSessionEntity::class
+        ListeningSessionEntity::class,
+        CharacterEntity::class
     ],
-    version = 6,
+    version = 9,
     exportSchema = false
 )
 abstract class AbookDatabase : RoomDatabase() {
@@ -34,6 +37,7 @@ abstract class AbookDatabase : RoomDatabase() {
     abstract fun chapterDao(): ChapterDao
     abstract fun bookmarkDao(): BookmarkDao
     abstract fun listeningSessionDao(): ListeningSessionDao
+    abstract fun characterDao(): CharacterDao
 
     companion object {
         @Volatile
@@ -68,6 +72,40 @@ abstract class AbookDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `characters` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `audiobookId` INTEGER NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `role` TEXT NOT NULL DEFAULT '',
+                        `description` TEXT NOT NULL DEFAULT '',
+                        `relationship` TEXT NOT NULL DEFAULT '',
+                        `isPrimary` INTEGER NOT NULL DEFAULT 0,
+                        FOREIGN KEY(`audiobookId`) REFERENCES `audiobooks`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_characters_audiobookId` ON `characters` (`audiobookId`)")
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE audiobooks ADD COLUMN customSpeed REAL DEFAULT NULL")
+                db.execSQL("ALTER TABLE audiobooks ADD COLUMN equalizerPreset TEXT DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE audiobooks ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE audiobooks ADD COLUMN parentSeries TEXT DEFAULT NULL")
+            }
+        }
+
         fun getInstance(context: Context): AbookDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -75,7 +113,7 @@ abstract class AbookDatabase : RoomDatabase() {
                     AbookDatabase::class.java,
                     "abook_database.db"
                 )
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
@@ -84,3 +122,7 @@ abstract class AbookDatabase : RoomDatabase() {
         }
     }
 }
+
+
+
+

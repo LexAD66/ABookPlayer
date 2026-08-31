@@ -26,11 +26,13 @@ object AbookModels {
         val narrator: String? = null,
         val description: String? = null,
         val cover: String? = null,
+        val parentSeries: String? = null,
         val series: String? = null,
         val seriesOrder: Int? = null,
         val totalDuration: Long? = null,
         val tracks: List<TrackRaw> = emptyList()
     )
+
 
     // --- Legacy Format (metadata.json) ---
 

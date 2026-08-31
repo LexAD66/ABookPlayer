@@ -34,7 +34,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.remember
 import coil.compose.AsyncImage
+import de.f_soft_studio.abookplayer.util.CoverHelper
 import java.io.File
 
 /**
@@ -92,10 +94,12 @@ fun SeriesStackCard(
                     shadowElevation = 4.dp
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        val coverUri = stack.coverUri
-                        if (!coverUri.isNullOrBlank() && File(coverUri).exists()) {
+                        val coverModel = remember(stack.seriesName, stack.coverUri) {
+                            CoverHelper.resolveCoverModel(stack.coverUri, null)
+                        }
+                        if (coverModel != null) {
                             AsyncImage(
-                                model = File(coverUri),
+                                model = coverModel,
                                 contentDescription = stack.seriesName,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()

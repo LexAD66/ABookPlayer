@@ -47,7 +47,10 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import de.f_soft_studio.abookplayer.ui.player.PlayerViewModel
 import de.f_soft_studio.abookplayer.ui.theme.DarkStageColorScheme
-import java.io.File
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.remember
+import de.f_soft_studio.abookplayer.util.CoverHelper
 
 /**
  * CarModeScreen: Fahrmodus mit extra großen Touch-Zielen (mind. 72dp),
@@ -105,10 +108,48 @@ fun CarModeScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(16.dp),
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
+                // Maximally Large High-Contrast Cover Artwork at the Top
+                val coverModel = remember(audiobook?.id, audiobook?.coverUri, audiobook?.filePath) {
+                    CoverHelper.resolveCoverModel(audiobook?.coverUri, audiobook?.filePath)
+                }
+
+                if (coverModel != null) {
+                    AsyncImage(
+                        model = coverModel,
+                        contentDescription = audiobook?.title ?: "Cover",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DirectionsCar,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(96.dp)
+                        )
+                    }
+                }
+
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 // Book Title & Chapter Banner
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -143,6 +184,9 @@ fun CarModeScreen(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
 
                 // Oversized Primary Controls
                 Row(

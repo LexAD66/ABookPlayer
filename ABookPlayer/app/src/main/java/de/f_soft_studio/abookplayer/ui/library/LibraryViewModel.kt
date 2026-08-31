@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -40,6 +42,15 @@ enum class StatusFilter {
 }
 
 /**
+ * Darstellungsmodi für Buchreihen / Unterordner.
+ */
+enum class SeriesDisplayMode(val label: String) {
+    STAPEL_KARTE("Kompakter Stapel"),
+    REIHEN_KARUSSELL("Regal / Karussell"),
+    ORDNER_LISTE("Ordner-Struktur")
+}
+
+/**
  * Repräsentiert eine gebündelte Buchreihe in der Bibliothek.
  */
 data class SeriesStack(
@@ -48,11 +59,12 @@ data class SeriesStack(
     val books: List<Audiobook>,
     val totalDuration: Long,
     val totalProgress: Float,
-    val coverUri: String?
+    val coverUri: String?,
+    val parentSeries: String? = null
 )
 
 /**
- * Ein Bibliothekselement: Weder ein Einzelbuch ODER ein Serien-Stapel.
+ * Ein Bibliothekselement: Entweder ein Einzelbuch ODER ein Serien-Stapel.
  */
 sealed class LibraryItem {
     data class SingleBook(val book: Audiobook) : LibraryItem()
@@ -64,7 +76,8 @@ sealed class LibraryItem {
  */
 class LibraryViewModel(
     private val repository: AudiobookRepository,
-    private val storage: AbookStorage
+    private val storage: AbookStorage,
+    private val context: android.content.Context? = null
 ) : ViewModel() {
 
     private val _messageEvent = MutableSharedFlow<String>()
@@ -79,14 +92,26 @@ class LibraryViewModel(
     private val _statusFilter = MutableStateFlow(StatusFilter.ALLE)
     val statusFilter: StateFlow<StatusFilter> = _statusFilter.asStateFlow()
 
+    private val _seriesDisplayMode = MutableStateFlow(SeriesDisplayMode.STAPEL_KARTE)
+    val seriesDisplayMode: StateFlow<SeriesDisplayMode> = _seriesDisplayMode.asStateFlow()
+
+    fun setSeriesDisplayMode(mode: SeriesDisplayMode) {
+        _seriesDisplayMode.value = mode
+    }
+
     private val _isGridView = MutableStateFlow(false)
     val isGridView: StateFlow<Boolean> = _isGridView.asStateFlow()
 
     private val _selectedBookIds = MutableStateFlow<Set<Long>>(emptySet())
     val selectedBookIds: StateFlow<Set<Long>> = _selectedBookIds.asStateFlow()
 
-    private val _favoriteBookIds = MutableStateFlow<Set<Long>>(emptySet())
-    val favoriteBookIds: StateFlow<Set<Long>> = _favoriteBookIds.asStateFlow()
+    val favoriteBookIds: StateFlow<Set<Long>> = repository.getAllAudiobooks()
+        .map { books -> books.filter { it.isFavorite }.map { it.id }.toSet() }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Lazily,
+            initialValue = emptySet()
+        )
 
     private val _expandedSeries = MutableStateFlow<SeriesStack?>(null)
     val expandedSeries: StateFlow<SeriesStack?> = _expandedSeries.asStateFlow()
@@ -114,23 +139,25 @@ class LibraryViewModel(
     }
 
     fun toggleFavorite(id: Long) {
-        val current = _favoriteBookIds.value.toMutableSet()
-        if (current.contains(id)) current.remove(id) else current.add(id)
-        _favoriteBookIds.value = current
+        viewModelScope.launch {
+            val book = repository.getAudiobookById(id)
+            book?.let {
+                repository.toggleFavorite(id, !it.isFavorite)
+            }
+        }
     }
 
     fun toggleFavoriteForSelected() {
-        val selected = _selectedBookIds.value
-        if (selected.isEmpty()) return
-        val currentFavs = _favoriteBookIds.value.toMutableSet()
-        val allSelectedAreFavs = selected.all { currentFavs.contains(it) }
-        if (allSelectedAreFavs) {
-            currentFavs.removeAll(selected)
-        } else {
-            currentFavs.addAll(selected)
+        viewModelScope.launch {
+            val selected = _selectedBookIds.value
+            if (selected.isEmpty()) return@launch
+            val books = repository.getAllAudiobooks().first().filter { selected.contains(it.id) }
+            val allSelectedAreFavs = books.all { it.isFavorite }
+            books.forEach { book ->
+                repository.toggleFavorite(book.id, !allSelectedAreFavs)
+            }
+            _selectedBookIds.value = emptySet()
         }
-        _favoriteBookIds.value = currentFavs
-        _selectedBookIds.value = emptySet()
     }
 
     fun deleteSelectedAudiobooks() {
@@ -149,7 +176,8 @@ class LibraryViewModel(
             ids.forEach { id ->
                 val book = repository.getAudiobookById(id)
                 book?.let {
-                    repository.saveAudiobook(it.copy(currentPosition = it.duration))
+                    val completedPos = if (it.duration > 0L) it.duration else 1L
+                    repository.saveAudiobook(it.copy(currentPosition = completedPos))
                 }
             }
             _selectedBookIds.value = emptySet()
@@ -175,15 +203,15 @@ class LibraryViewModel(
         repository.getAllAudiobooks(),
         _searchQuery,
         _sortOrder,
-        _statusFilter,
-        _favoriteBookIds
-    ) { books, query, sort, status, favs ->
+        _statusFilter
+    ) { books, query, sort, status ->
         val searchFiltered = if (query.isBlank()) {
             books
         } else {
             books.filter {
                 it.title.contains(query, ignoreCase = true) ||
                 it.author.contains(query, ignoreCase = true) ||
+                (it.parentSeries?.contains(query, ignoreCase = true) == true) ||
                 (it.series?.contains(query, ignoreCase = true) == true) ||
                 (it.narrator?.contains(query, ignoreCase = true) == true)
             }
@@ -192,9 +220,9 @@ class LibraryViewModel(
         val statusFiltered = when (status) {
             StatusFilter.ALLE -> searchFiltered
             StatusFilter.ANGEFANGEN -> searchFiltered.filter { it.currentPosition > 0L && (it.duration <= 0L || it.currentPosition < it.duration - 5000L) }
-            StatusFilter.BEENDET -> searchFiltered.filter { it.duration > 0L && it.currentPosition >= it.duration - 5000L }
+            StatusFilter.BEENDET -> searchFiltered.filter { (it.duration > 0L && it.currentPosition >= it.duration - 5000L) || (it.duration <= 0L && it.currentPosition > 0L) }
             StatusFilter.UNGESPIELT -> searchFiltered.filter { it.currentPosition == 0L }
-            StatusFilter.FAVORITEN -> searchFiltered.filter { favs.contains(it.id) }
+            StatusFilter.FAVORITEN -> searchFiltered.filter { it.isFavorite }
         }
 
         when (sort) {
@@ -202,7 +230,8 @@ class LibraryViewModel(
             SortOrder.TITEL -> statusFiltered.sortedBy { it.title.lowercase() }
             SortOrder.AUTOR -> statusFiltered.sortedBy { it.author.lowercase() }
             SortOrder.SERIEN -> statusFiltered.sortedWith(
-                compareBy<Audiobook> { it.series?.lowercase() ?: "zzzz" }
+                compareBy<Audiobook> { it.parentSeries?.lowercase() ?: it.series?.lowercase() ?: "zzzz" }
+                    .thenBy { it.series?.lowercase() ?: "zzzz" }
                     .thenBy { it.seriesOrder ?: 999 }
                     .thenBy { it.title.lowercase() }
             )
@@ -220,28 +249,36 @@ class LibraryViewModel(
         _sortOrder
     ) { books, sort ->
         if (sort == SortOrder.SERIEN) {
-            val (seriesBooks, standaloneBooks) = books.partition { !it.series.isNullOrBlank() }
-            val seriesGroups = seriesBooks.groupBy { it.series!!.trim() }
+            val (seriesBooks, standaloneBooks) = books.partition { !it.series.isNullOrBlank() || !it.parentSeries.isNullOrBlank() }
+            val seriesGroups = seriesBooks.groupBy {
+                val p = it.parentSeries?.trim().orEmpty()
+                val s = it.series?.trim().orEmpty()
+                if (p.isNotBlank() && s.isNotBlank()) "$p - $s" else if (p.isNotBlank()) p else s
+            }
 
             val items = mutableListOf<LibraryItem>()
 
-            seriesGroups.forEach { (seriesName, group) ->
-                val sortedGroup = group.sortedBy { it.seriesOrder ?: 999 }
+            seriesGroups.forEach { (seriesDisplayName, group) ->
+                val sortedGroup = group.sortedWith(
+                    compareBy<Audiobook> { it.seriesOrder ?: 999 }.thenBy { it.title.lowercase() }
+                )
                 if (sortedGroup.size >= 2) {
                     val author = sortedGroup.firstOrNull { it.author.isNotBlank() }?.author ?: ""
                     val totalDuration = sortedGroup.sumOf { it.duration }
                     val totalPosition = sortedGroup.sumOf { it.currentPosition }
                     val totalProgress = if (totalDuration > 0) (totalPosition.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f) else 0f
                     val cover = sortedGroup.firstOrNull { !it.coverUri.isNullOrBlank() }?.coverUri
+                    val parent = sortedGroup.firstOrNull { !it.parentSeries.isNullOrBlank() }?.parentSeries
                     items.add(
                         LibraryItem.Series(
                             SeriesStack(
-                                seriesName = seriesName,
+                                seriesName = seriesDisplayName,
                                 author = author,
                                 books = sortedGroup,
                                 totalDuration = totalDuration,
                                 totalProgress = totalProgress,
-                                coverUri = cover
+                                coverUri = cover,
+                                parentSeries = parent
                             )
                         )
                     )
@@ -263,6 +300,9 @@ class LibraryViewModel(
 
     init {
         scanAudiobooks()
+        viewModelScope.launch {
+            repository.recalculateZeroDurationBooks(context)
+        }
     }
 
     fun onSearchQueryChanged(query: String) {
@@ -277,13 +317,20 @@ class LibraryViewModel(
         _statusFilter.value = filter
     }
 
+    private val _detectedDuplicates = MutableStateFlow<List<de.f_soft_studio.abookplayer.util.DuplicateMatch>>(emptyList())
+    val detectedDuplicates: StateFlow<List<de.f_soft_studio.abookplayer.util.DuplicateMatch>> = _detectedDuplicates.asStateFlow()
+
     fun scanAudiobooks() {
         viewModelScope.launch {
+            storage.clearDetectedDuplicates()
             val imported = storage.scanAndImport()
+            _detectedDuplicates.value = storage.getDetectedDuplicates()
             if (imported.isNotEmpty()) {
                 _messageEvent.emit("${imported.size} neue(s) Hörbuch(er) importiert")
+            } else if (_detectedDuplicates.value.isNotEmpty()) {
+                _messageEvent.emit("${_detectedDuplicates.value.size} identische(s) Duplikat(e) gefunden")
             } else {
-                _messageEvent.emit("Scan beendet. Keine neuen .abook-Dateien gefunden.")
+                _messageEvent.emit("Scan beendet. Keine neuen Hörbücher oder Ordner gefunden.")
             }
         }
     }
@@ -291,12 +338,63 @@ class LibraryViewModel(
     fun importFromUri(uri: android.net.Uri) {
         viewModelScope.launch {
             val result = storage.importFromUri(uri)
+            _detectedDuplicates.value = storage.getDetectedDuplicates()
             if (result != null) {
                 _messageEvent.emit("Hörbuch '${result.title}' erfolgreich importiert")
             } else {
                 _messageEvent.emit("Fehler beim Importieren der Datei")
             }
         }
+    }
+
+    fun importFromFolderUri(uri: android.net.Uri) {
+        viewModelScope.launch {
+            storage.clearDetectedDuplicates()
+            val count = storage.importFromFolderUri(uri)
+            _detectedDuplicates.value = storage.getDetectedDuplicates()
+            if (count > 0) {
+                _messageEvent.emit("$count Hörbuch(er) erfolgreich aus Ordner importiert")
+            } else if (_detectedDuplicates.value.isNotEmpty()) {
+                _messageEvent.emit("${_detectedDuplicates.value.size} identische(s) Duplikat(e) gefunden")
+            } else {
+                _messageEvent.emit("Keine neuen Hörbücher im ausgewählten Ordner gefunden.")
+            }
+        }
+    }
+
+    fun deleteDuplicate(match: de.f_soft_studio.abookplayer.util.DuplicateMatch) {
+        viewModelScope.launch {
+            val success = storage.deleteDuplicateFromStorage(match)
+            _detectedDuplicates.value = storage.getDetectedDuplicates()
+            if (success) {
+                _messageEvent.emit("Doppelgänger auf dem Speicher gelöscht.")
+            } else {
+                _messageEvent.emit("Fehler beim Löschen des Doppelgängers.")
+            }
+        }
+    }
+
+    fun cleanupLibrary() {
+        viewModelScope.launch {
+            val result = repository.cleanupDuplicatesAndOrphans(context)
+            val parts = mutableListOf<String>()
+            if (result.duplicatesRemoved > 0) parts.add("${result.duplicatesRemoved} doppelte(r)")
+            if (result.orphansRemoved > 0) parts.add("${result.orphansRemoved} verwaiste(r)")
+            if (result.zeroDurationFixed > 0) parts.add("${result.zeroDurationFixed} 0-min-Hörbuch(er) repariert")
+
+            val message = if (parts.isNotEmpty()) {
+                "Aufräumen beendet: ${parts.joinToString(", ")}."
+            } else {
+                "Bibliothek ist bereits sauber. Keine fehlerhaften Einträge."
+            }
+            _messageEvent.emit(message)
+        }
+    }
+
+    fun dismissDuplicate(match: de.f_soft_studio.abookplayer.util.DuplicateMatch) {
+        val current = _detectedDuplicates.value.toMutableList()
+        current.remove(match)
+        _detectedDuplicates.value = current
     }
 
     fun importAudiobook(audiobook: Audiobook) {
@@ -312,3 +410,4 @@ class LibraryViewModel(
         }
     }
 }
+

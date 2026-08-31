@@ -25,6 +25,11 @@ data class Audiobook(
     val duration: Long = 0L,
     val currentPosition: Long = 0L,
     val lastPlayed: Long = System.currentTimeMillis(),
+    val parentSeries: String? = null,
     val series: String? = null,
-    val seriesOrder: Int? = null
+    val seriesOrder: Int? = null,
+    val isFavorite: Boolean = false,
+    val customSpeed: Float? = null,
+    val equalizerPreset: String? = null
 )
+

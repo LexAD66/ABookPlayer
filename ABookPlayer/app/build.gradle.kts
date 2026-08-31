@@ -14,8 +14,8 @@ android {
         applicationId = "de.f_soft_studio.abookplayer"
         minSdk = 24
         targetSdk = 35
-        versionCode = 110
-        versionName = "1.1.0"
+        versionCode = 300
+        versionName = "2.0.0"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -88,6 +88,7 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
 
     // Misc
+    implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("com.google.android.material:material:1.12.0")

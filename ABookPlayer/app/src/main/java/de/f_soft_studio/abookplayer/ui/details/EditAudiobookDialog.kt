@@ -28,11 +28,12 @@ import de.f_soft_studio.abookplayer.domain.model.Audiobook
 fun EditAudiobookDialog(
     audiobook: Audiobook,
     onDismiss: () -> Unit,
-    onConfirm: (title: String, author: String, narrator: String?, series: String?, seriesOrder: Int?) -> Unit
+    onConfirm: (title: String, author: String, narrator: String?, parentSeries: String?, series: String?, seriesOrder: Int?) -> Unit
 ) {
     var title by remember { mutableStateOf(audiobook.title) }
     var author by remember { mutableStateOf(audiobook.author) }
     var narrator by remember { mutableStateOf(audiobook.narrator ?: "") }
+    var parentSeries by remember { mutableStateOf(audiobook.parentSeries ?: "") }
     var series by remember { mutableStateOf(audiobook.series ?: "") }
     var seriesOrderText by remember { mutableStateOf(audiobook.seriesOrder?.toString() ?: "") }
 
@@ -69,9 +70,18 @@ fun EditAudiobookDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 OutlinedTextField(
+                    value = parentSeries,
+                    onValueChange = { parentSeries = it },
+                    label = { Text("Übergeordnete Reihe (z. B. Perry Rhodan)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
                     value = series,
                     onValueChange = { series = it },
-                    label = { Text("Serie / Buchreihe (z. B. Harry Potter)") },
+                    label = { Text("Serie / Zyklus (z. B. Atlantis)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -90,15 +100,17 @@ fun EditAudiobookDialog(
         confirmButton = {
             TextButton(
                 onClick = {
+                    val finalParentSeries = parentSeries.trim().ifBlank { null }
                     val finalSeries = series.trim().ifBlank { null }
                     val finalSeriesOrder = seriesOrderText.trim().toIntOrNull()
                     val finalNarrator = narrator.trim().ifBlank { null }
-                    onConfirm(title.trim(), author.trim(), finalNarrator, finalSeries, finalSeriesOrder)
+                    onConfirm(title.trim(), author.trim(), finalNarrator, finalParentSeries, finalSeries, finalSeriesOrder)
                 }
             ) {
                 Text("Speichern")
             }
         },
+
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Abbrechen")

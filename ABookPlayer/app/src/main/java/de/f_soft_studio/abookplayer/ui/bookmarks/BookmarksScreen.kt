@@ -1,5 +1,6 @@
 package de.f_soft_studio.abookplayer.ui.bookmarks
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -13,6 +14,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -161,29 +165,52 @@ fun BookmarksScreen(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface
                             ),
-                            shape = RoundedCornerShape(8.dp)
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
+                                    .padding(14.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Position: ${formatTimeMs(bookmark.position)}",
-                                        style = MaterialTheme.typography.titleMedium
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(4.dp)
+                                            .height(44.dp)
+                                            .background(
+                                                color = MaterialTheme.colorScheme.primary,
+                                                shape = RoundedCornerShape(2.dp)
+                                            )
                                     )
-                                    if (bookmark.note.isNotBlank()) {
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = bookmark.note,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = "⏱️ ${formatTimeMs(bookmark.position)}",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                        if (bookmark.note.isNotBlank()) {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = "»${bookmark.note}«",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 }
+
                                 Row {
                                     IconButton(onClick = {
                                         editingBookmark = bookmark
@@ -192,19 +219,22 @@ fun BookmarksScreen(
                                         Icon(
                                             imageVector = Icons.Default.Edit,
                                             contentDescription = "Notiz bearbeiten",
-                                            tint = MaterialTheme.colorScheme.primary
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
                                     IconButton(onClick = { onDeleteBookmark(bookmark) }) {
                                         Icon(
                                             imageVector = Icons.Default.Delete,
                                             contentDescription = "Lesezeichen löschen",
-                                            tint = MaterialTheme.colorScheme.error
+                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
                                 }
                             }
                         }
+
                     }
                 }
             }

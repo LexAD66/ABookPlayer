@@ -1,6 +1,7 @@
 package de.f_soft_studio.abookplayer.ui.details
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,9 +46,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import android.util.Log
+import androidx.compose.runtime.remember
 import coil.compose.AsyncImage
 import de.f_soft_studio.abookplayer.domain.model.Audiobook
 import de.f_soft_studio.abookplayer.domain.model.Chapter
+import de.f_soft_studio.abookplayer.util.CoverHelper
 import java.io.File
 import java.util.Locale
 
@@ -59,6 +64,9 @@ import androidx.compose.material3.OutlinedButton
 import de.f_soft_studio.abookplayer.domain.model.ExportState
 
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Image
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,14 +81,39 @@ fun DetailsScreen(
     audiobook: Audiobook?,
     chapters: List<Chapter>,
     exportState: ExportState = ExportState.Idle,
+    isSearchingOnline: Boolean = false,
     onPlayClick: () -> Unit,
     onExportToUri: (android.net.Uri) -> Unit = {},
     onSearchCoverOnline: () -> Unit = {},
     onEditClick: () -> Unit = {},
+    onOpenCharacters: () -> Unit = {},
+    onOpenInfo: (Audiobook) -> Unit = {},
     onUpdateMetadata: (Audiobook) -> Unit = {},
     onBackClick: () -> Unit
 ) {
+
     var showEditDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            val coversDir = de.f_soft_studio.abookplayer.storage.LibraryLocationManager.getCoversDir(context)
+            val targetFile = File(coversDir, "custom_cover_${audiobook?.id ?: 0}.jpg")
+            try {
+
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    targetFile.outputStream().use { output -> input.copyTo(output) }
+                }
+                if (audiobook != null) {
+                    onUpdateMetadata(audiobook.copy(coverUri = targetFile.absolutePath))
+                }
+            } catch (e: Exception) {
+                Log.e("DetailsScreen", "Fehler beim Speichern des Galerie-Covers: ${e.message}")
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -92,6 +125,11 @@ fun DetailsScreen(
                     }
                 },
                 actions = {
+                    audiobook?.let { book ->
+                        IconButton(onClick = { onOpenInfo(book) }) {
+                            Icon(Icons.Default.Info, contentDescription = "eBook & Hörbuch Info", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
                     IconButton(onClick = { showEditDialog = true }) {
                         Icon(Icons.Default.Edit, contentDescription = "Metadaten bearbeiten", tint = MaterialTheme.colorScheme.primary)
                     }
@@ -124,7 +162,15 @@ fun DetailsScreen(
             }
         } else {
             val file = File(audiobook.filePath)
-            val fileSizeFormatted = if (file.exists()) formatFileSize(file.length()) else "Unbekannt"
+            val fileSize = if (file.exists()) {
+                if (file.isDirectory) {
+                    file.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+                } else {
+                    file.length()
+                }
+            } else 0L
+            val fileSizeFormatted = formatFileSize(fileSize)
+            val effectiveDuration = if (audiobook.duration > 0L) audiobook.duration else chapters.sumOf { 0L }
 
             val createDocumentLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.CreateDocument("application/zip")
@@ -143,10 +189,12 @@ fun DetailsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Large Cover Artwork
-                val coverUri = audiobook.coverUri
-                if (!coverUri.isNullOrBlank() && File(coverUri).exists()) {
+                val coverModel = remember(audiobook.id, audiobook.coverUri, audiobook.filePath) {
+                    CoverHelper.resolveCoverModel(audiobook.coverUri, audiobook.filePath)
+                }
+                if (coverModel != null) {
                     AsyncImage(
-                        model = File(coverUri),
+                        model = coverModel,
                         contentDescription = audiobook.title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -189,12 +237,19 @@ fun DetailsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                if (!audiobook.series.isNullOrBlank()) {
+                if (!audiobook.series.isNullOrBlank() || !audiobook.parentSeries.isNullOrBlank()) {
                     Spacer(modifier = Modifier.height(4.dp))
-                    val seriesText = if (audiobook.seriesOrder != null) {
-                        "Serie: ${audiobook.series} (Band ${audiobook.seriesOrder})"
-                    } else {
-                        "Serie: ${audiobook.series}"
+                    val seriesText = buildString {
+                        if (!audiobook.parentSeries.isNullOrBlank()) {
+                            append("Reihe: ${audiobook.parentSeries}")
+                        }
+                        if (!audiobook.series.isNullOrBlank()) {
+                            if (isNotEmpty()) append(" • ")
+                            append("Serie: ${audiobook.series}")
+                        }
+                        if (audiobook.seriesOrder != null) {
+                            append(" (Band ${audiobook.seriesOrder})")
+                        }
                     }
                     Text(
                         text = seriesText,
@@ -203,6 +258,7 @@ fun DetailsScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
+
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -214,7 +270,7 @@ fun DetailsScreen(
                 ) {
                     AssistChip(
                         onClick = {},
-                        label = { Text("⏱️ ${formatTimeMs(audiobook.duration)}") }
+                        label = { Text("⏱️ ${formatTimeMs(effectiveDuration)}") }
                     )
                     AssistChip(
                         onClick = {},
@@ -277,39 +333,83 @@ fun DetailsScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
+                Spacer(modifier = Modifier.height(10.dp))
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = onSearchCoverOnline,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Default.Info,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Online Suche", style = MaterialTheme.typography.bodyMedium)
+                        OutlinedButton(
+                            onClick = onSearchCoverOnline,
+                            modifier = Modifier.weight(1f),
+                            enabled = !isSearchingOnline,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            if (isSearchingOnline) {
+                                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Online-Cover", style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = { galleryLauncher.launch("image/*") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Image,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Galerie-Cover", style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                        }
                     }
 
-                    OutlinedButton(
-                        onClick = onEditClick,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(12.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Default.Edit,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Bearbeiten", style = MaterialTheme.typography.bodyMedium)
+                        OutlinedButton(
+                            onClick = onOpenCharacters,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.People,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Figuren", style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                        }
+
+                        OutlinedButton(
+                            onClick = { showEditDialog = true },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Bearbeiten", style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                        }
                     }
                 }
+
 
                 if (exportState is ExportState.Success) {
                     Spacer(modifier = Modifier.height(8.dp))

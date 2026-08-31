@@ -1,13 +1,19 @@
 package de.f_soft_studio.abookplayer.ui.theme
 
+import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 
 enum class AppThemeMode(val label: String) {
+    SYSTEM_DYNAMIC("System (Material You)"),
     DARK_STAGE("Dark Stage"),
     FOREST_MOSS("Smaragd Wald"),
     MIDNIGHT_VIOLET("Mitternacht Violett"),
@@ -74,7 +80,17 @@ fun ABookTheme(
     themeMode: AppThemeMode = AppThemeMode.DARK_STAGE,
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
+    val isDark = isSystemInDarkTheme()
+
     val colorScheme: ColorScheme = when (themeMode) {
+        AppThemeMode.SYSTEM_DYNAMIC -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            } else {
+                DarkStageColorScheme
+            }
+        }
         AppThemeMode.DARK_STAGE -> DarkStageColorScheme
         AppThemeMode.FOREST_MOSS -> ForestMossColorScheme
         AppThemeMode.MIDNIGHT_VIOLET -> MidnightVioletColorScheme

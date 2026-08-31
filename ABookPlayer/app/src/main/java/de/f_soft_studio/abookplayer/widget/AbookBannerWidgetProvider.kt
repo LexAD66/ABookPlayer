@@ -117,8 +117,9 @@ class AbookBannerWidgetProvider : AppWidgetProvider() {
             val duration = controller.duration.value
 
             // Geblürtes Cover-Hintergrundbild setzen
-            val blurredBitmap = loadAndBlurCover(audiobook, 6)
+            val blurredBitmap = loadAndBlurCover(audiobook, 3)
             if (blurredBitmap != null) {
+
                 views.setImageViewBitmap(R.id.widget_bg_image, blurredBitmap)
             } else {
                 views.setImageViewResource(R.id.widget_bg_image, 0)
@@ -159,17 +160,27 @@ class AbookBannerWidgetProvider : AppWidgetProvider() {
                 if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
             )
 
-            // App öffnen bei Klick auf Titel oder Autor
+            // Sharp small cover image next to text
+            val coverBitmap = loadCoverBitmap(context, audiobook)
+            if (coverBitmap != null) {
+                views.setImageViewBitmap(R.id.widget_cover_image, coverBitmap)
+            } else {
+                views.setImageViewResource(R.id.widget_cover_image, R.drawable.ic_launcher_foreground)
+            }
+
+            // App öffnen bei Klick auf Titel, Autor oder Cover
             val appIntent = PendingIntent.getActivity(
                 context,
                 0,
                 Intent(context, MainActivity::class.java),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
+            views.setOnClickPendingIntent(R.id.widget_cover_image, appIntent)
             views.setOnClickPendingIntent(R.id.widget_title, appIntent)
             views.setOnClickPendingIntent(R.id.widget_author, appIntent)
             views.setOnClickPendingIntent(R.id.widget_progress_text, appIntent)
             views.setOnClickPendingIntent(R.id.widget_progress_bar, appIntent)
+
 
             // Broadcast Intents für alle Steuerungsknöpfe
             val playPauseIntent = PendingIntent.getBroadcast(
@@ -226,7 +237,49 @@ class AbookBannerWidgetProvider : AppWidgetProvider() {
             } catch (_: Exception) {}
         }
 
+        private fun loadCoverBitmap(context: Context, audiobook: Audiobook?): Bitmap? {
+            if (audiobook == null) return null
+            return try {
+                var original: Bitmap? = null
+                val coverUri = audiobook.coverUri
+                if (!coverUri.isNullOrBlank()) {
+                    val coverFile = File(coverUri)
+                    if (coverFile.exists()) {
+                        original = BitmapFactory.decodeFile(coverFile.absolutePath)
+                    }
+                }
+
+                if (original == null && audiobook.filePath.isNotBlank()) {
+                    val file = File(audiobook.filePath)
+                    val targetAudioFile = if (file.isDirectory) {
+                        file.listFiles()?.firstOrNull { FolderScanner.isAudioFile(it) }
+                    } else if (file.exists()) {
+                        file
+                    } else null
+
+                    if (targetAudioFile != null && targetAudioFile.exists()) {
+                        try {
+                            val retriever = android.media.MediaMetadataRetriever()
+                            retriever.setDataSource(targetAudioFile.absolutePath)
+                            val art = retriever.embeddedPicture
+                            retriever.release()
+                            if (art != null && art.isNotEmpty()) {
+                                original = BitmapFactory.decodeByteArray(art, 0, art.size)
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }
+
+                if (original != null) {
+                    Bitmap.createScaledBitmap(original, 160, 160, true)
+                } else null
+            } catch (_: Exception) {
+                null
+            }
+        }
+
         private fun loadAndBlurCover(audiobook: Audiobook?, radius: Int): Bitmap? {
+
             if (audiobook == null) return null
             return try {
                 var original: Bitmap? = null
@@ -263,8 +316,9 @@ class AbookBannerWidgetProvider : AppWidgetProvider() {
 
                 // Downscale for smooth high-performance blur
                 val small = Bitmap.createScaledBitmap(original, 100, 100, true)
-                val blurred = fastBoxBlur(small, radius = radius.coerceIn(4, 10))
+                val blurred = fastBoxBlur(small, radius = radius.coerceIn(1, 10))
                 Bitmap.createScaledBitmap(blurred, 300, 300, true)
+
             } catch (_: Exception) {
                 null
             }

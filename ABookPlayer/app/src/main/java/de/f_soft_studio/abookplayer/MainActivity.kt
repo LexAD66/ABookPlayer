@@ -12,6 +12,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import de.f_soft_studio.abookplayer.data.local.db.AbookDatabase
 import de.f_soft_studio.abookplayer.data.repository.AudiobookRepository
 import de.f_soft_studio.abookplayer.domain.usecase.RecordListeningTimeUseCase
@@ -37,6 +40,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        hideSystemNavigationBars()
+
 
         requestStorageAndNotificationPermissions()
 
@@ -45,7 +50,8 @@ class MainActivity : ComponentActivity() {
             audiobookDao = db.audiobookDao(),
             chapterDao = db.chapterDao(),
             bookmarkDao = db.bookmarkDao(),
-            listeningSessionDao = db.listeningSessionDao()
+            listeningSessionDao = db.listeningSessionDao(),
+            characterDao = db.characterDao()
         )
         val storage = AbookStorage(applicationContext, repository)
         val recordListeningTimeUseCase = RecordListeningTimeUseCase(repository)
@@ -88,6 +94,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        hideSystemNavigationBars()
+    }
+
+    private fun hideSystemNavigationBars() {
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.navigationBars())
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         // Do not release playbackController here if playback is actively running in background service
@@ -96,3 +114,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+

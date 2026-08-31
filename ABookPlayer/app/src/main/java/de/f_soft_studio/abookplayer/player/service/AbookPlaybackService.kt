@@ -131,7 +131,11 @@ class AbookPlaybackService : MediaLibraryService() {
             ?: audiobook?.author?.ifBlank { "Hörbuch-Wiedergabe aktiv" }
             ?: "Hörbuch-Wiedergabe aktiv"
 
-        val coverBitmap = loadCoverBitmap(audiobook?.coverUri)
+        val coverBitmap = de.f_soft_studio.abookplayer.util.CoverHelper.loadCoverBitmap(
+            context = this,
+            coverUri = audiobook?.coverUri,
+            filePath = audiobook?.filePath
+        )
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
@@ -158,20 +162,6 @@ class AbookPlaybackService : MediaLibraryService() {
         }
 
         return builder.build()
-    }
-
-    private fun loadCoverBitmap(coverUri: String?): Bitmap? {
-        if (coverUri.isNullOrBlank()) return null
-        return try {
-            val file = File(coverUri)
-            if (!file.exists()) return null
-            val options = BitmapFactory.Options().apply {
-                inSampleSize = 2
-            }
-            BitmapFactory.decodeFile(file.absolutePath, options)
-        } catch (_: Exception) {
-            null
-        }
     }
 
     companion object {

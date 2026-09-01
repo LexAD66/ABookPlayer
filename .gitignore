@@ -35,3 +35,8 @@ captures/
 Thumbs.db
 *.log
 *.tmp
+
+# Lokale Debug-Artefakte (Geraete-Dumps, Logcat, DB-Pulls)
+*.db
+/logcat_repro.txt
+/ui.xml

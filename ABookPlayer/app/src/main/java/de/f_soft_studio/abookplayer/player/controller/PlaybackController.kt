@@ -31,12 +31,16 @@ import de.f_soft_studio.abookplayer.domain.model.Chapter
 import de.f_soft_studio.abookplayer.domain.usecase.SaveProgressUseCase
 import de.f_soft_studio.abookplayer.player.service.AbookPlaybackService
 import de.f_soft_studio.abookplayer.util.AudiobookMetadataText
+import de.f_soft_studio.abookplayer.util.PlayableMedia
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
@@ -233,6 +237,10 @@ class PlaybackController(
     private val _currentChapter = MutableStateFlow<Chapter?>(null)
     val currentChapter: StateFlow<Chapter?> = _currentChapter.asStateFlow()
 
+    /** Einmalige Wiedergabe-Fehlermeldungen für die UI (z. B. fehlende/verschobene Audiodateien). */
+    private val _playbackError = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val playbackError: SharedFlow<String> = _playbackError.asSharedFlow()
+
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
@@ -357,32 +365,38 @@ class PlaybackController(
         if (isMultiFile) {
             chapterList.forEach { ch ->
                 val path = ch.audioPath
-                if (!path.isNullOrBlank()) {
-                    val file = File(path)
-                    if (file.exists()) {
-                        val chMetadata = createMetadata(ch)
-                        mediaItems.add(
-                            MediaItem.Builder()
-                                .setUri(Uri.fromFile(file))
-                                .setMediaMetadata(chMetadata)
-                                .build()
-                        )
-                    }
-                }
-            }
-        } else {
-            val singlePath = distinctAudioPaths.firstOrNull() ?: audiobook.filePath
-            if (singlePath.isBlank().not()) {
-                val file = File(singlePath)
-                if (file.exists()) {
+                if (PlayableMedia.isPlayableFile(path)) {
+                    val chMetadata = createMetadata(ch)
                     mediaItems.add(
                         MediaItem.Builder()
-                            .setUri(Uri.fromFile(file))
-                            .setMediaMetadata(mediaMetadata)
+                            .setUri(Uri.fromFile(File(path!!)))
+                            .setMediaMetadata(chMetadata)
                             .build()
                     )
                 }
             }
+        } else {
+            val singlePath = distinctAudioPaths.firstOrNull() ?: audiobook.filePath
+            if (PlayableMedia.isPlayableFile(singlePath)) {
+                mediaItems.add(
+                    MediaItem.Builder()
+                        .setUri(Uri.fromFile(File(singlePath)))
+                        .setMediaMetadata(mediaMetadata)
+                        .build()
+                )
+            }
+        }
+
+        // Letzter Fallback: direkter Buchpfad – aber nur, wenn es eine echte Datei ist.
+        // Ein Verzeichnis (z. B. ein imported_*-Ordner ohne Dateien) würde ExoPlayer
+        // mit "EISDIR (Is a directory)" abbrechen lassen; die Wiedergabe wirkt dann tot.
+        if (mediaItems.isEmpty() && PlayableMedia.isPlayableFile(audiobook.filePath)) {
+            mediaItems.add(
+                MediaItem.Builder()
+                    .setUri(Uri.fromFile(File(audiobook.filePath)))
+                    .setMediaMetadata(mediaMetadata)
+                    .build()
+            )
         }
 
         if (mediaItems.isNotEmpty()) {
@@ -395,21 +409,11 @@ class PlaybackController(
                 play()
             }
         } else {
-            val file = File(audiobook.filePath)
-            if (file.exists()) {
-                val mediaItem = MediaItem.Builder()
-                    .setUri(Uri.fromFile(file))
-                    .setMediaMetadata(mediaMetadata)
-                    .build()
-                player.setMediaItem(mediaItem)
-                player.prepare()
-                applyPlaybackSpeed()
-                applyVolumeBoost()
-                seekTo(audiobook.currentPosition)
-                if (autoPlay) {
-                    play()
-                }
-            }
+            // Keine abspielbare Datei gefunden (verschoben/gelöscht oder Pfad ist ein Ordner).
+            _playbackError.tryEmit(
+                "Keine abspielbaren Audiodateien für „${audiobook.title}“ gefunden. " +
+                    "Die Dateien wurden vermutlich verschoben oder gelöscht – bitte das Hörbuch neu importieren."
+            )
         }
 
         updateCurrentChapter(audiobook.currentPosition)

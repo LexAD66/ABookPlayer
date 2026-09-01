@@ -1,6 +1,7 @@
 package de.f_soft_studio.abookplayer.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,6 +72,13 @@ fun AppRoot(
     val duration by playbackController.duration.collectAsState()
     val chapters by playbackController.chapters.collectAsState()
     val currentChapter by playbackController.currentChapter.collectAsState()
+
+    // Wiedergabe-Fehler (z. B. fehlende/verschobene Audiodateien) sichtbar machen.
+    LaunchedEffect(Unit) {
+        playbackController.playbackError.collect { message ->
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
 
     val bookmarksState = currentAudiobook?.let { book ->
         repository.getBookmarksForAudiobook(book.id).collectAsState(initial = emptyList())

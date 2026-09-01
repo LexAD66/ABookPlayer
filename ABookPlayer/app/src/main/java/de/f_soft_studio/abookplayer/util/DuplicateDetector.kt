@@ -41,7 +41,11 @@ object DuplicateDetector {
         if (!authorMatch) return ComparisonType.UNIQUE
 
         val durationDiff = abs(newDurationMs - existingBook.duration)
-        val sameDuration = durationDiff <= 5000L // Max 5 Sekunden Abweichung
+        // Unbekannte Dauer (0 = Dateien nicht lesbar) ist KEIN Unterscheidungsmerkmal.
+        // Sonst wird ein erneut gescanntes, kaputtes Hörbuch als "andere Version" gewertet
+        // und bei jedem Scan als " (Edition)"-Klon neu angelegt.
+        val durationUnknown = newDurationMs <= 0L || existingBook.duration <= 0L
+        val sameDuration = durationUnknown || durationDiff <= 5000L // Max 5 Sekunden Abweichung
         val sameChapters = newChapterCount == 0 || existingChapterCount == 0 || abs(newChapterCount - existingChapterCount) <= 1
         val sameNarrator = newNarrator.isNullOrBlank() || existingBook.narrator.isNullOrBlank() ||
                 normalizeText(newNarrator).equals(normalizeText(existingBook.narrator ?: ""), ignoreCase = true)

@@ -163,7 +163,17 @@ class AudiobookRepository(
                     }
                 } else {
                     val file = java.io.File(path)
-                    if (!file.exists()) {
+                    // Verwaist ist ein Buch auch dann, wenn sein Pfad ein Verzeichnis ist,
+                    // das keine Audiodateien (mehr) enthält – z. B. ein leerer imported_*-Ordner,
+                    // dessen Dateien verschoben/gelöscht wurden. `File.exists()` allein reicht
+                    // nicht, weil es für Verzeichnisse `true` liefert.
+                    val isOrphan = when {
+                        !file.exists() -> true
+                        file.isDirectory -> file.walkTopDown().maxDepth(5)
+                            .none { it.isFile && de.f_soft_studio.abookplayer.storage.FolderScanner.isAudioFile(it) }
+                        else -> false
+                    }
+                    if (isOrphan) {
                         idsToDelete.add(book.id)
                         orphansCount++
                     }

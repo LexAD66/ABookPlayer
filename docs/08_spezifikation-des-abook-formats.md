@@ -56,7 +56,7 @@ mein-hoerbuch.abook
 
 | Kategorie | Formate |
 | --- | --- |
-| Audio | MP3, M4A, M4B, AAC; FLAC später möglich |
+| Audio | MP3, M4A, M4B, AAC, OGG, OPUS, WAV, WMA, FLAC (alle erkannt; siehe `FolderScanner`/`AudiobookMetadataText`) |
 | Cover | JPG/JPEG, PNG, WebP |
 
 ## 8.5 Sicherheits- und Validierungsregeln
@@ -85,7 +85,7 @@ mein-hoerbuch.abook
 
 1. Fallback-Platzhalter verwenden.
 
-1. Thumbnail auf etwa 512 × 512 Pixel erzeugen und unter cacheDir/abook/covers/<hash> speichern.
+1. Thumbnail erzeugen und im Bibliotheks-Verwaltungsordner `…/Audiobooks/.abooklib/covers/` (mit internem Fallback) ablegen; Laufzeit-Bitmaps via `util/CoverHelper`.
 
 ---
 

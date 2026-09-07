@@ -1,46 +1,50 @@
 # 4. Architektur
 
-Die App verwendet eine pragmatische Schichtentrennung. Abhängigkeiten zeigen nach innen: UI kennt ViewModels und Domain-Modelle, die Domain kennt keine Android-Details, und die Data-Schicht implementiert Repositories für Room, SAF und .abook-Verarbeitung.
+Die App verwendet eine pragmatische Schichtentrennung. Abhängigkeiten zeigen nach innen: UI kennt ViewModels und Domain-Modelle, die Domain kennt keine Android-Details, und die Data-/Storage-Schicht kapselt Room, SAF und `.abook`-Verarbeitung.
 
-| Schicht | Verantwortung | Typische Bestandteile |
+| Schicht (Paket) | Verantwortung | Typische Bestandteile |
 | --- | --- | --- |
-| presentation / ui | Darstellung, UI-Zustand, Benutzerereignisse | Compose Screens, Komponenten, UiState, ViewModels, Navigation |
-| domain | Geschäftsregeln und stabile Schnittstellen | Modelle, Repository-Interfaces, UseCases |
-| data | Persistenz und Dateiverarbeitung | Room, DAO, Repository-Implementierungen, SAF-Scanner, .abook-Parser |
-| playback | Wiedergabe unabhängig von Screens | PlayerController, MediaSessionService, MediaItems, Fortschrittsevents |
-| di | Zusammenbau der Anwendung | Hilt-Module für Datenbank, Repositories, Player und Parser |
+| `ui/` | Darstellung, UI-Zustand, Benutzerereignisse | Compose Screens, Komponenten, `*UiState`, ViewModels, `AppRoot` (Navigation) |
+| `domain/` | Geschäftsregeln und stabile Modelle | `domain/model/`, `domain/usecase/` (ohne Android-Abhängigkeiten) |
+| `data/` | Persistenz | Room `entity/`, `dao/`, `db/AbookDatabase`, `repository/AudiobookRepository` |
+| `storage/` | Datei- und Ordnerverarbeitung | `AbookStorage`, `FolderScanner`, `LibraryLocationManager`, Cover-Scraper, `storage/sync/` (WebDAV) |
+| `player/` | Wiedergabe unabhängig von Screens | `player/controller/` (`PlaybackController`, `SleepTimerController`, `LoudnessController`), `player/service/AbookPlaybackService` |
+| `util/` | Reine Hilfslogik | `DuplicateDetector`, `AudiobookMetadataText`, `PlayableMedia`, `ChapterDurations`, `CoverHelper`, `ShakeDetector` |
+| `widget/` | Homescreen-Widgets | `AbookWidgetProvider`, `AbookBannerWidgetProvider` |
+
+**Zusammenbau der Anwendung:** keine DI-Bibliothek. `MainActivity.onCreate` erzeugt `AbookDatabase.getInstance()`, `AudiobookRepository` und `PlaybackController.getInstance()`; `AppRoot` konstruiert die ViewModels mit `remember { … }`.
 
 ## 4.1 Datenfluss
 
 ```text
 Compose UI
     -> ViewModel / UiState
-        -> UseCase
-            -> Repository-Interface
-                -> Room / SAF / .abook / Media3
+        -> UseCase oder Repository / Storage
+            -> Room / SAF / .abook / Media3 / WebDAV
 ```
 
 ```text
 Player- und Datenereignisse
-    -> Repository oder PlayerController
-        -> StateFlow
+    -> Repository oder PlaybackController
+        -> StateFlow / SharedFlow
             -> ViewModel
                 -> Compose UI
 ```
 
 ## 4.2 Single Source of Truth
 
-Room ist die verbindliche Quelle für Bibliothek, Kapitel, Fortschritt, Lesezeichen und Statistik. Dateisystem und Archive liefern Importdaten; sie dürfen UI-Zustand nicht dauerhaft parallel zur Datenbank verwalten. Der Player besitzt nur den flüchtigen Wiedergabezustand und schreibt relevante Änderungen zurück.
+Room ist die verbindliche Quelle für Bibliothek, Kapitel, Fortschritt, Lesezeichen, Figuren und Statistik. Dateisystem und Archive liefern Importdaten; sie halten keinen dauerhaften UI-Zustand parallel zur Datenbank. Der Player besitzt nur den flüchtigen Wiedergabezustand und schreibt relevante Änderungen (Position, Speed) zurück in Room.
 
 ## 4.3 Fehlerbehandlung
 
 | Fehler | UI-Reaktion | Technische Reaktion |
 | --- | --- | --- |
-| Datei fehlt | „Datei nicht verfügbar“ und „Neu verknüpfen“ anbieten | Datensatz erhalten, Verfügbarkeit markieren. |
-| Berechtigung fehlt | Geführte Erklärung und Ordner erneut auswählen | Persistierte URI-Berechtigung erneuern. |
-| Playerfehler | Snackbar oder Dialog mit verständlicher Meldung | Fehler loggen, Session stabil halten, optional nächsten Track prüfen. |
-| Ungültiges .abook | Import abbrechen und genaue Ursache anzeigen | Keine Teilimporte; temporäre Dateien bereinigen. |
-| Datenbankmigration | Start nicht mit Datenverlust fortsetzen | Explizite Migrationen und Tests; destructive migration nur in Entwicklung. |
+| Keine abspielbare Datei (Pfad fehlt oder ist ein Verzeichnis) | Toast „Keine abspielbaren Audiodateien für … gefunden – bitte neu importieren." | `PlayableMedia.isPlayableFile` filtert Verzeichnisse aus; kein `play()`, `PlaybackController.playbackError` emittiert. |
+| Berechtigung fehlt | Erklärung und Ordner erneut auswählen | Persistierte SAF-URI-Berechtigung erneuern. |
+| Scan / Cleanup schlägt fehl | Snackbar mit Ursache | `LibraryViewModel` fängt `Exception` (nicht `CancellationException`), Re-Entrancy-Guard über `isScanning`/`isCleaning`. |
+| Ungültiges `.abook` | Import abbrechen und Ursache anzeigen | Keine Teilimporte; ZIP-Slip-/Größenprüfung; temporäre Dateien bereinigen. |
+| Verwaister DB-Eintrag (Datei/Ordner leer) | Wird beim „Aufräumen" entfernt | `cleanupDuplicatesAndOrphans`: Eintrag verwaist, wenn Pfad fehlt **oder** ein Verzeichnis ohne Audiodateien ist. |
+| Datenbankmigration | Start ohne Datenverlust | Explizite Migrationen 3→11; `fallbackToDestructiveMigration()` nur als letzte Absicherung. |
 
 ---
 

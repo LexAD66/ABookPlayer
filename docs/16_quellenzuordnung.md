@@ -1,5 +1,7 @@
 # 16. Quellenzuordnung
 
+> Historische Zuordnung der konsolidierten Kapitel zu den ursprünglichen Archiv-Dateien. Für den aktuellen Stand gelten der Quellcode, [`../PROJECT_HISTORY.md`](../PROJECT_HISTORY.md) und [`../ABookPlayer/redesign.md`](../ABookPlayer/redesign.md).
+
 | Konsolidierter Bereich | Hauptquellen aus den Archiven |
 | --- | --- |
 | Projektziele / Entscheidungen | PROJECT_BRIEF.md, DECISIONS.md, 00_projekt-ueberblick.md, 01_anforderungen.md |

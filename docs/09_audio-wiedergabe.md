@@ -1,34 +1,36 @@
 # 9. Audio-Wiedergabe
 
-- MediaSessionService als Foreground Service.
+Kern: `player/service/AbookPlaybackService` (`MediaLibraryService`, Foreground) + `player/controller/PlaybackController` (kapselt ExoPlayer, Single-Instance via `getInstance`).
 
-- ExoPlayer wird über einen PlayerController gekapselt.
+- Play/Pause, Seek, `-10s` / `+10s` / `+30s`, vorheriges/nächstes Kapitel.
+- Geschwindigkeit 0,75× bis 2,0× (pro Hörbuch speicherbar über `customSpeed`).
+- Lautheits-Boost und Equalizer-Presets über `LoudnessController`; „Stille überspringen" (Skip Silence).
+- Fortschritt wird gedrosselt sowie bei Pause, Kapitelwechsel, Stop und Service-Ende in Room geschrieben.
+- Wiederaufnahme an Kapitel und Position ohne unerwünschten Neustart am Anfang; „Smart Rewind" spult nach längerer Pause etwas zurück.
+- MediaSession- und Notification-Aktionen für Headset, Bluetooth und Sperrbildschirm; Audio-Focus und Becoming-Noisy werden behandelt.
 
-- Play/Pause, Seek, ±10 Sekunden, vorheriges/nächstes Kapitel.
+## 9.1 Medienquellen und Fehlerfälle
 
-- Geschwindigkeit 0,75× bis 2,0×.
+- Kapitel-`MediaItem`s werden aus `chapter.audioPath` bzw. aus einer Einzelquelle gebaut.
+- Nur reguläre Dateien werden akzeptiert (`util/PlayableMedia.isPlayableFile` = `File.isFile`). Verzeichnispfade werden nie an ExoPlayer übergeben – sonst bricht die Wiedergabe mit `EISDIR` ab und wirkt „tot".
+- Findet der Controller keine abspielbare Datei, ruft er **kein** `play()`, sondern emittiert `PlaybackController.playbackError` (`SharedFlow<String>`); `AppRoot` zeigt die Meldung als Toast.
+- Titel/Untertitel/Interpret für MediaSession/Notification/Android Auto liefert `util/AudiobookMetadataText` (entfernt Datei-Endungen, garantiert nicht-leeren Titel).
 
-- Fortschritt regelmäßig und bei Pause, Kapitelwechsel, Stop sowie Service-Ende speichern.
+## 9.2 Android Auto
 
-- Wiederaufnahme an Kapitel und Position, ohne unerwünschten Neustart am Anfang.
+- Browsing über `MediaLibraryService`; eigener Auto-Modus-Screen (`ui/car/`).
+- `-10s`/`+10s`-Custom-Actions nutzen **app-lokale** Vektor-Icons (`ic_skip_back_10`, `ic_skip_forward_10`); `android.R.drawable.*` ist in Android Auto nicht auflösbar.
 
-- MediaSession- und Notification-Aktionen für Headset, Bluetooth und Sperrbildschirm.
+## 9.3 Fortschrittsspeicherung
 
-- Audio-Focus, Becoming-Noisy und Unterbrechungen korrekt behandeln.
+Positionen werden nicht bei jedem Player-Tick geschrieben, sondern gedrosselt und bei Zustandswechseln. Positionen nahe dem Kapitelende können beim Wiederaufnehmen normalisiert werden; abgeschlossene Hörbücher erhalten einen eindeutigen Status. Optionaler WebDAV-Abgleich über `SyncProgressUseCase`.
 
-## 9.1 Fortschrittsspeicherung
+## 9.4 Sleep Timer (`SleepTimerController`)
 
-Positionen werden nicht bei jedem Player-Tick in Room geschrieben. Empfohlen sind gedrosselte Intervalle sowie sofortige Speicherung bei wichtigen Zustandswechseln. Eine Position nahe dem Kapitelende kann beim Wiederaufnehmen auf das nächste Kapitel normalisiert werden; abgeschlossene Hörbücher erhalten einen eindeutigen Status.
-
-## 9.2 Sleep Timer
-
-- Vordefinierte Zeiten und optional „Kapitelende“.
-
-- Timer läuft unabhängig vom aktuellen Screen.
-
-- Nach Ablauf pausiert der Player und speichert den Fortschritt.
-
-- Restzeit ist im Player sichtbar; Abbrechen und Verlängern sind möglich.
+- Vordefinierte Zeiten (15 / 30 / 45 / 60 min) und „Kapitelende".
+- Läuft unabhängig vom aktuellen Screen; Restzeit im Player sichtbar; Abbrechen und Verlängern möglich.
+- Shake-to-Extend (`util/ShakeDetector`) verlängert per Schütteln; „Smart Sleep Bookmark" setzt beim Einschlafen automatisch ein Lesezeichen.
+- Nach Ablauf pausiert der Player (optional mit Ausblenden) und speichert den Fortschritt.
 
 ---
 

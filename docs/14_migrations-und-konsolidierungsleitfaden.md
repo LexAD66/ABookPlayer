@@ -1,32 +1,31 @@
 # 14. Migrations- und Konsolidierungsleitfaden
 
-1. Aktuelle Android-Codebasis als alleinigen produktiven Ausgangspunkt festlegen.
+## 14.1 Status der Konsolidierung
 
-1. JSX/HTML-Prototypen in einen design-reference-Ordner verschieben und klar kennzeichnen.
+- Die native Codebasis unter `ABookPlayer/` ist der alleinige produktive Ausgangspunkt. ✅
+- JSX/HTML-Prototypen liegen getrennt in `ABook_Player_Antigravity_Plan/` und sind reine Designreferenz. ✅
+- Ein kanonisches Domain-Modell (`domain/model/`) und ein Room-Schema (v11) sind etabliert. ✅
+- Legacy-`metadata.json` wird im Parser weiterhin erkannt; `manifest.json`/`manifest.xml` ist kanonisch. ✅
+- Der Hörfortschritt liegt als Spalte in `audiobooks` (keine separate Progress-Entity, keine offene ID-Migration). ✅
 
-1. Doppelte Modelle, Services und Repositories inventarisieren; vor Entfernung Abhängigkeiten und Datenmigration prüfen.
+## 14.2 Room-Migrationsleiter
 
-1. Ein kanonisches Domain-Modell und ein Room-Schema festlegen.
+`AbookDatabase` verwendet explizite Migrationen `MIGRATION_3_4` … `MIGRATION_10_11` (Details in Kapitel 6.1) plus `fallbackToDestructiveMigration()` als letzte Absicherung. Schema wird nicht exportiert (`exportSchema = false`). Jede Schemaänderung braucht eine neue nummerierte Migration.
 
-1. Legacy-.abook- oder metadata.json-Unterstützung hinter einem ImportAdapter kapseln.
+## 14.3 Vor jeder Änderung
 
-1. Alte Fortschritts- und Track-IDs über explizite Migration auf stabile IDs überführen.
+1. Zuerst analysieren, dann in kleinen, kompilierbaren Schritten ändern.
+2. Nach jedem Schritt `./gradlew.bat test` (+ `assembleDebug` bei UI/Ressourcen/Manifest).
+3. Vor release-nahen Änderungen zusätzlich `assembleRelease` und manuelle Wiedergabetests.
 
-1. Nach jedem kleinen Schritt Unit-Tests und assembleDebug ausführen.
+## 14.4 Nicht ungeprüft löschen
 
-1. Am Ende assembleRelease, Instrumentation-Tests und manuelle Wiedergabetests durchführen.
-
-## 14.1 Nicht ungeprüft löschen
-
-- Room-Migrationen und exportierte Schemas.
-
+- Room-Migrationen.
 - Dateiformat-Beispiele und Testarchive.
-
-- Designreferenzen, solange das Compose-UI noch nicht visuell abgenommen wurde.
-
-- Legacy-Parser, solange bestehende Nutzerdateien nicht migriert sind.
-
-- ProGuard-/R8-Regeln für Media3, Room oder Serialisierung.
+- Designreferenzen in `ABook_Player_Antigravity_Plan/`, solange das Compose-UI nicht visuell abgenommen ist.
+- Legacy-Parserpfade, solange bestehende Nutzerdateien nicht migriert sind.
+- `proguard-rules.pro` (auch wenn R8 aktuell aus ist).
+- Lokale Debug-Artefakte im Repo-Root (`*.db`, `logcat_repro.txt`, `ui.xml`) sind via `.gitignore` ausgeschlossen.
 
 ---
 

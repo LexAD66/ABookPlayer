@@ -1,6 +1,6 @@
-# 15. Master-Prompt für Gemini Flash 2.5
+# 15. Master-Prompt für KI-Weiterentwicklung
 
-Der folgende Prompt ist für Verbesserungen und kontrollierte Weiterentwicklung in Android Studio Otter 2025.2.1 vorgesehen.
+Der folgende Prompt ist für Verbesserungen und kontrollierte Weiterentwicklung vorgesehen. Ergänzend gelten [`../CLAUDE.md`](../CLAUDE.md) und [`../ABook_Player_Antigravity_Plan/AGENTS.md`](../ABook_Player_Antigravity_Plan/AGENTS.md).
 
 ```text
 Du arbeitest am Projekt „ABook Player“, einer offline-first Android-App für lokale Hörbücher.
@@ -8,12 +8,12 @@ Du arbeitest am Projekt „ABook Player“, einer offline-first Android-App für
 
 ```text
 Entwicklungsumgebung:
-- Android Studio Otter | 2025.2.1
-- JDK 21
-- Windows 11
-- Kotlin, Jetpack Compose, Material 3
-- Media3 ExoPlayer + MediaSessionService
-- Room, Hilt, Coroutines, StateFlow
+- JDK / JVM-Target 21, Windows 11, Gradle-Root: ABookPlayer/ (gradlew.bat)
+- AGP 8.5.2, Kotlin 2.0.20, KSP, compileSdk/targetSdk 35, minSdk 24
+- Kotlin, Jetpack Compose (BOM 2025.01.00), Material 3
+- Media3 1.4.1: ExoPlayer + MediaLibraryService
+- Room 2.6.1 (Schema v11), Coroutines, StateFlow/SharedFlow
+- Dependency Injection: MANUELL (getInstance-Singletons + remember), KEIN Hilt
 - Paketname: de.f_soft_studio.abookplayer
 ```
 
@@ -28,7 +28,7 @@ Verbindliche Regeln:
 7. Füge keine Library hinzu, wenn die vorhandenen Mittel genügen.
 8. Lösche keine Datei ohne vorherige Liste mit Begründung und Abhängigkeitsprüfung.
 9. Berücksichtige Scoped Storage, persistierbare SAF-Berechtigungen und stabile IDs.
-10. Für .abook gilt Formatversion 1 mit manifest.json oder manifest.xml; Legacy-Formate nur über Adapter.
+10. Für .abook gilt manifest.json oder manifest.xml als kanonisch; Legacy-metadata.json wird im Parser weiterhin erkannt.
 11. Playeränderungen müssen Hintergrundwiedergabe, MediaSession, Audio-Focus und Fortschrittsspeicherung erhalten.
 12. Erstelle oder aktualisiere passende Unit-Tests.
 ```

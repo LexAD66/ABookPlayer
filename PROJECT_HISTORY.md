@@ -6,28 +6,45 @@ Diese Datei dokumentiert alle **abgeschlossenen Fortschritte** sowie alle **gepl
 
 ## 📊 Übersicht des aktuellen Projektstatus
 
-- **Status:** Phasen 0–19 umgesetzt und versioniert. Nächster Schwerpunkt: **Phase 20 – Library-Umstrukturierung** (siehe [`ABookPlayer/redesign.md`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/redesign.md)).
-- **Letzte Aktualisierung:** 31. August 2026
-- **Git:** Arbeitsstand der Phasen 15–19 in thematischen Commits gesichert (Sync, Audio-Engine, Figuren, Library-Wartung, Kapitel-Editor, Core-Verdrahtung). Sicherungs-Branch `backup/pre-cleanup-2026-08-31`.
-- **Build-Status:** ⏳ Verifikation nach dem Cleanup-Commit ausstehend (`gradlew test` / `assembleDebug`).
-- **Zielarchitektur:** Clean Architecture (MVVM mit Jetpack Compose, Media3, Room, Hilt)
+- **Status:** Phasen 0–23 umgesetzt und versioniert (inkl. UI-Redesign, R8-Härtung, Migrationstests, Compose-Animationen, Instrumentation-Tests & Tablet/Foldable-UX).
+- **Letzte Aktualisierung:** 9. September 2026
+- **Build-Status:** 🟢 Alle Unit- & Migrationstests grün (`gradlew test`), `assembleDebug`, `assembleRelease` & `assembleDebugAndroidTest` verifiziert.
+- **Zielarchitektur:** Clean Architecture (MVVM mit Jetpack Compose, Media3, Room, manuelle DI)
 
-### 🔜 Phase 20: Library-Umstrukturierung (geplant)
+### ✅ Phase 20: Library-Umstrukturierung & UI-Redesign (abgeschlossen)
 
-- [ ] Informationsarchitektur gemäß `redesign.md` umsetzen: Trennung von **Bibliothek** (Hörfluss) und **Bibliothek verwalten** (Scan, Cleanup, Duplikate, Dauer-Reparatur, Speicherort-Migration).
-- [ ] Top-Bar entschlacken: nur Suche, Ansicht (Liste/Raster), Mehr-Menü.
-- [ ] Kompakte Active-Filter-Bar (max. 2–3 sichtbare Chips + `Filter`-Button) statt mehrerer Chip-Zeilen.
-- [ ] Import/Scan/Cleanup aus einem Sammel-Dialog in ein `Hinzufügen`-Bottom-Sheet + eigenen Wartungsbereich aufteilen.
-- [ ] Favoriten persistent machen (Room statt nur ViewModel-State).
+- [x] Informationsarchitektur gemäß `redesign.md` umgesetzt: Trennung von **Bibliothek** (Hörfluss) und **Bibliothek verwalten** (Scan, Cleanup, Duplikate, Dauer-Reparatur).
+- [x] Top-Bar entschlackt: Suche, Ansichtsumschaltung (Liste/Raster), Sleep-Timer-Badge und 3-Punkte-Mehr-Menü.
+- [x] Kompakte Active-Filter-Bar (aktiver Status, Sortierung, Filter-Button, Zurücksetzen) statt mehrerer horizontaler Chip-Zeilen.
+- [x] Auslagerung der Filter-Optionen in `FilterBottomSheet.kt`.
+- [x] Auslagerung der Import-Optionen in `AddAudiobookBottomSheet.kt` (SAF Ordner/Datei, Standardscan).
+- [x] Dedizierter Screen `LibraryManagementScreen.kt` für Scan, Aufräumen & Reparieren, Speicher-Duplikate (`DuplicateMatch`) und Ergebnis-Anzeige.
+- [x] Modulare Zerlegung von `LibraryScreen.kt` (`AudiobookItemCard.kt`, `AudiobookGridCard.kt`, `MiniPlayerBar.kt`, `SeriesDisplayCards.kt`).
+- [x] Favoriten persistent in Room (`isFavorite`).
 - [x] `addedAt`-Spalte + Room-Migration 9→10; „Neu importiert" sortiert nach `addedAt`.
 - [x] Automatischen Scan + Dauer-Reparatur aus `LibraryViewModel.init` entfernt.
 - [x] `LibraryMaintenanceUiState` (isScanning / isCleaning / lastScanMessage / duplicates / cleanupResult) eingeführt.
-- [ ] Serienansicht als bewusster Modus behandeln (nur bei `Sortierung = Serien`).
-- [ ] Tests: `LibraryViewModelTest` erweitern; Build-Verifizierung.
+- [x] Serienansicht als bewusster Modus (nur bei `Sortierung = Serien`).
+- [x] Unit-Tests und Debug-Build erfolgreich verifiziert.
 
-> Backend-Teil (Spec A, `docs/superpowers/specs/2026-08-31-library-backend-design.md`)
-> abgeschlossen. Offen: UI-Umbau (Spec B) – Top-Bar, Filter-Bottom-Sheet,
-> Add-Bottom-Sheet, `library_management`-Screen, Zerlegung von `LibraryScreen.kt`.
+### ✅ Phase 21: Release-Härtung & R8 / ProGuard (abgeschlossen)
+
+- [x] `isMinifyEnabled = true` und `isShrinkResources = true` für Release-Builds in `build.gradle.kts` aktiviert.
+- [x] `proguard-rules.pro` vollständig und robust konfiguriert für Room (Entities, DAOs, Database), Media3/ExoPlayer (Session, PlaybackService), Coil, Kotlinx Serialization, App Widgets und Domain-Modelle.
+- [x] Vollständige Verifikation des optimierten Release-Builds (`assembleRelease`) und der Test-Suite (`test`).
+
+### ✅ Phase 22: Migrationstests, UI-Transitions & Instrumentation (`androidTest`) (abgeschlossen)
+
+- [x] **Room-Migrationstests (b):** Vollständige Test-Suite `DatabaseMigrationTest.kt` mit schrittweiser Verifikation aller Migrationen v3→v4 bis v10→v11 sowie End-to-End-Upgrade.
+- [x] **UI-Animationen & Transitions (d):** Flüssige Übergänge im `NavHost` (`AppRoot.kt`) mit Slide-Up/Down für die Player Stage und horizontalen Slide-Transitions für Details, Einstellungen und Verwaltung.
+- [x] **Instrumentation-Tests (e):** `androidTest/`-Quellset eingerichtet mit AndroidX TestRunner, Compose-Test-Dependencies und `AudiobookCardTest.kt` (`assembleDebugAndroidTest` grün).
+
+### ✅ Phase 23: Tablet- & Foldable-UX / Adaptive Layouts (abgeschlossen)
+
+- [x] **Adaptive Grid in Library:** Umstellung auf `GridCells.Adaptive(minSize = 150.dp)` mit `GridItemSpan`-Unterstützung für Serienkarussell und Ordnerlisten.
+- [x] **2-Spalten-Split in Details:** `DetailsScreen.kt` zeigt auf breiten Bildschirmen / Querformat links Cover & Aktionen und rechts Titel, Metadaten, Beschreibung & Statistik.
+- [x] **2-Spalten-Split in Statistiken:** `StatisticsScreen.kt` ordnet Kennzahlen (2x2) und das 7-Tage-Aktivitätsdiagramm auf breiten Displays nebeneinander an.
+- [x] **Querformat & Foldables:** Optimierte Nutzung der Bildschirmbreite über `LocalConfiguration` und sauberes Scrollverhalten.
 
 ---
 

@@ -42,6 +42,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
 import de.f_soft_studio.abookplayer.domain.model.DayActivity
 import de.f_soft_studio.abookplayer.domain.model.ListeningStatistics
 
@@ -55,6 +57,8 @@ fun StatisticsScreen(
     onBackClick: () -> Unit
 ) {
     val stats by viewModel.statistics.collectAsState()
+    val configuration = LocalConfiguration.current
+    val isWideScreen = configuration.screenWidthDp >= 600 || configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     Scaffold(
         topBar = {
@@ -81,91 +85,194 @@ fun StatisticsScreen(
             )
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Metric Cards Grid
+        if (isWideScreen) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                MetricCard(
-                    title = "Heute",
-                    value = formatTime(stats.todaySeconds),
-                    icon = Icons.Default.Info,
-                    modifier = Modifier.weight(1f)
-                )
-                MetricCard(
-                    title = "Diese Woche",
-                    value = formatTime(stats.thisWeekSeconds),
-                    icon = Icons.Default.Star,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                MetricCard(
-                    title = "Gesamtzeit",
-                    value = formatTime(stats.totalSeconds),
-                    icon = Icons.Default.Star,
-                    modifier = Modifier.weight(1f)
-                )
-                MetricCard(
-                    title = "Serie / Streak",
-                    value = if (stats.currentStreakDays > 0) "${stats.currentStreakDays} Tage 🔥" else "0 Tage",
-                    icon = Icons.Default.Star,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // 7-Tage-Aktivitätsdiagramm
-            Text(
-                text = "Letzte 7 Tage",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
+                // Left Column: 4 Metric Cards (2x2 Grid)
                 Column(
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier
+                        .weight(0.45f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (stats.dailyActivityLast7Days.isNotEmpty()) {
-                        WeeklyBarChart(
-                            dailyActivities = stats.dailyActivityLast7Days,
-                            primaryColor = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        MetricCard(
+                            title = "Heute",
+                            value = formatTime(stats.todaySeconds),
+                            icon = Icons.Default.Info,
+                            modifier = Modifier.weight(1f)
                         )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp),
-                            contentAlignment = Alignment.Center
+                        MetricCard(
+                            title = "Diese Woche",
+                            value = formatTime(stats.thisWeekSeconds),
+                            icon = Icons.Default.Star,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        MetricCard(
+                            title = "Gesamtzeit",
+                            value = formatTime(stats.totalSeconds),
+                            icon = Icons.Default.Star,
+                            modifier = Modifier.weight(1f)
+                        )
+                        MetricCard(
+                            title = "Serie / Streak",
+                            value = if (stats.currentStreakDays > 0) "${stats.currentStreakDays} Tage 🔥" else "0 Tage",
+                            icon = Icons.Default.Star,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                // Right Column: 7-Tage-Aktivitätsdiagramm
+                Column(
+                    modifier = Modifier
+                        .weight(0.55f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Letzte 7 Tage",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
                         ) {
-                            Text(
-                                text = "Keine Aktivitäten in den letzten 7 Tagen",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            if (stats.dailyActivityLast7Days.isNotEmpty()) {
+                                WeeklyBarChart(
+                                    dailyActivities = stats.dailyActivityLast7Days,
+                                    primaryColor = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(140.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Keine Aktivitäten in den letzten 7 Tagen",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .background(MaterialTheme.colorScheme.background)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Metric Cards Grid
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MetricCard(
+                        title = "Heute",
+                        value = formatTime(stats.todaySeconds),
+                        icon = Icons.Default.Info,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        title = "Diese Woche",
+                        value = formatTime(stats.thisWeekSeconds),
+                        icon = Icons.Default.Star,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MetricCard(
+                        title = "Gesamtzeit",
+                        value = formatTime(stats.totalSeconds),
+                        icon = Icons.Default.Star,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        title = "Serie / Streak",
+                        value = if (stats.currentStreakDays > 0) "${stats.currentStreakDays} Tage 🔥" else "0 Tage",
+                        icon = Icons.Default.Star,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 7-Tage-Aktivitätsdiagramm
+                Text(
+                    text = "Letzte 7 Tage",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        if (stats.dailyActivityLast7Days.isNotEmpty()) {
+                            WeeklyBarChart(
+                                dailyActivities = stats.dailyActivityLast7Days,
+                                primaryColor = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant
                             )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(120.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Keine Aktivitäten in den letzten 7 Tagen",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }

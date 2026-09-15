@@ -1,5 +1,6 @@
 package de.f_soft_studio.abookplayer.ui.details
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
@@ -180,33 +183,26 @@ fun DetailsScreen(
                 }
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .verticalScroll(rememberScrollState())
-                    .padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Large Cover Artwork
-                val coverModel = remember(audiobook.id, audiobook.coverUri, audiobook.filePath) {
-                    CoverHelper.resolveCoverModel(audiobook.coverUri, audiobook.filePath)
-                }
+            val configuration = LocalConfiguration.current
+            val isWideScreen = configuration.screenWidthDp >= 600 || configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+            val coverModel = remember(audiobook.id, audiobook.coverUri, audiobook.filePath) {
+                CoverHelper.resolveCoverModel(audiobook.coverUri, audiobook.filePath)
+            }
+
+            @Composable
+            fun CoverView(modifier: Modifier = Modifier) {
                 if (coverModel != null) {
                     AsyncImage(
                         model = coverModel,
                         contentDescription = audiobook.title,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth(0.65f)
-                            .aspectRatio(1f)
+                        modifier = modifier
                             .clip(RoundedCornerShape(16.dp))
                     )
                 } else {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.65f)
-                            .aspectRatio(1f)
+                        modifier = modifier
                             .clip(RoundedCornerShape(16.dp))
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
@@ -219,71 +215,10 @@ fun DetailsScreen(
                         )
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Title & Author
-                Text(
-                    text = audiobook.title,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                if (audiobook.author.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = audiobook.author,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                if (!audiobook.series.isNullOrBlank() || !audiobook.parentSeries.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    val seriesText = buildString {
-                        if (!audiobook.parentSeries.isNullOrBlank()) {
-                            append("Reihe: ${audiobook.parentSeries}")
-                        }
-                        if (!audiobook.series.isNullOrBlank()) {
-                            if (isNotEmpty()) append(" • ")
-                            append("Serie: ${audiobook.series}")
-                        }
-                        if (audiobook.seriesOrder != null) {
-                            append(" (Band ${audiobook.seriesOrder})")
-                        }
-                    }
-                    Text(
-                        text = seriesText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Summary Badges Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    AssistChip(
-                        onClick = {},
-                        label = { Text("⏱️ ${formatTimeMs(effectiveDuration)}") }
-                    )
-                    AssistChip(
-                        onClick = {},
-                        label = { Text("📚 ${chapters.size} Kapitel") }
-                    )
-                    AssistChip(
-                        onClick = {},
-                        label = { Text("💾 $fileSizeFormatted") }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
+            @Composable
+            fun ActionButtonsSection() {
                 // Play / Resume Action Button
                 Button(
                     onClick = onPlayClick,
@@ -410,7 +345,6 @@ fun DetailsScreen(
                     }
                 }
 
-
                 if (exportState is ExportState.Success) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -426,9 +360,71 @@ fun DetailsScreen(
                         color = MaterialTheme.colorScheme.error
                     )
                 }
+            }
 
-                Spacer(modifier = Modifier.height(24.dp))
+            @Composable
+            fun TitleAndSeriesSection() {
+                Text(
+                    text = audiobook.title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                if (audiobook.author.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = audiobook.author,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (!audiobook.series.isNullOrBlank() || !audiobook.parentSeries.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    val seriesText = buildString {
+                        if (!audiobook.parentSeries.isNullOrBlank()) {
+                            append("Reihe: ${audiobook.parentSeries}")
+                        }
+                        if (!audiobook.series.isNullOrBlank()) {
+                            if (isNotEmpty()) append(" • ")
+                            append("Serie: ${audiobook.series}")
+                        }
+                        if (audiobook.seriesOrder != null) {
+                            append(" (Band ${audiobook.seriesOrder})")
+                        }
+                    }
+                    Text(
+                        text = seriesText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
 
+            @Composable
+            fun BadgesRow() {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AssistChip(
+                        onClick = {},
+                        label = { Text("⏱️ ${formatTimeMs(effectiveDuration)}") }
+                    )
+                    AssistChip(
+                        onClick = {},
+                        label = { Text("📚 ${chapters.size} Kapitel") }
+                    )
+                    AssistChip(
+                        onClick = {},
+                        label = { Text("💾 $fileSizeFormatted") }
+                    )
+                }
+            }
+
+            @Composable
+            fun DescriptionAndTechnicalCards() {
                 // Description Section Card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -483,6 +479,70 @@ fun DetailsScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         DetailStatRow(icon = Icons.Default.Folder, label = "Dateipfad", value = audiobook.filePath)
                     }
+                }
+            }
+
+            if (isWideScreen) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    // Left Pane: Cover, Badges, Actions
+                    Column(
+                        modifier = Modifier
+                            .weight(0.42f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CoverView(
+                            modifier = Modifier
+                                .fillMaxWidth(0.85f)
+                                .aspectRatio(1f)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        BadgesRow()
+                        Spacer(modifier = Modifier.height(12.dp))
+                        ActionButtonsSection()
+                    }
+
+                    // Right Pane: Title, Description, Tech Info
+                    Column(
+                        modifier = Modifier
+                            .weight(0.58f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        TitleAndSeriesSection()
+                        Spacer(modifier = Modifier.height(16.dp))
+                        DescriptionAndTechnicalCards()
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CoverView(
+                        modifier = Modifier
+                            .fillMaxWidth(0.65f)
+                            .aspectRatio(1f)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    TitleAndSeriesSection()
+                    Spacer(modifier = Modifier.height(12.dp))
+                    BadgesRow()
+                    Spacer(modifier = Modifier.height(12.dp))
+                    ActionButtonsSection()
+                    Spacer(modifier = Modifier.height(24.dp))
+                    DescriptionAndTechnicalCards()
                 }
             }
         }

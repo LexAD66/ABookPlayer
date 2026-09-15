@@ -1,5 +1,9 @@
 package de.f_soft_studio.abookplayer.ui
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -18,6 +22,7 @@ import de.f_soft_studio.abookplayer.storage.AbookStorage
 import de.f_soft_studio.abookplayer.ui.bookmarks.BookmarksScreen
 import de.f_soft_studio.abookplayer.ui.chapters.ChaptersScreen
 import de.f_soft_studio.abookplayer.ui.info.EbookInfoScreen
+import de.f_soft_studio.abookplayer.ui.library.LibraryManagementScreen
 import de.f_soft_studio.abookplayer.ui.library.LibraryScreen
 import de.f_soft_studio.abookplayer.ui.library.LibraryViewModel
 import de.f_soft_studio.abookplayer.ui.player.PlayerScreen
@@ -39,7 +44,7 @@ import de.f_soft_studio.abookplayer.domain.model.ExportState
 import de.f_soft_studio.abookplayer.ui.theme.ABookTheme
 
 /**
- * AppRoot: Navigations-Hauptansicht der ABook Player Anwendung.
+ * AppRoot: Navigations-Hauptansicht der ABook Player Anwendung mit flüssigen Übergangsanimationen.
  */
 @Composable
 fun AppRoot(
@@ -88,9 +93,39 @@ fun AppRoot(
     ABookTheme(themeMode = appThemeMode) {
         NavHost(
             navController = navController,
-            startDestination = "library"
+            startDestination = "library",
+            enterTransition = {
+                fadeIn(animationSpec = tween(280)) + slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(280)
+                )
+            },
+            exitTransition = {
+                fadeOut(animationSpec = tween(220)) + slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(220)
+                )
+            },
+            popEnterTransition = {
+                fadeIn(animationSpec = tween(280)) + slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(280)
+                )
+            },
+            popExitTransition = {
+                fadeOut(animationSpec = tween(220)) + slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(220)
+                )
+            }
         ) {
-        composable("library") {
+        composable(
+            route = "library",
+            enterTransition = { fadeIn(animationSpec = tween(250)) },
+            exitTransition = { fadeOut(animationSpec = tween(200)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(250)) },
+            popExitTransition = { fadeOut(animationSpec = tween(200)) }
+        ) {
             LibraryScreen(
                 viewModel = libraryViewModel,
                 currentAudiobook = currentAudiobook,
@@ -116,12 +151,22 @@ fun AppRoot(
                 onImportRequested = {
                     libraryViewModel.scanAudiobooks()
                 },
+                onOpenLibraryManagement = {
+                    navController.navigate("library_management")
+                },
                 onOpenStatistics = {
                     navController.navigate("statistics")
                 },
                 onOpenSettings = {
                     navController.navigate("settings")
                 }
+            )
+        }
+
+        composable("library_management") {
+            LibraryManagementScreen(
+                viewModel = libraryViewModel,
+                onBackClick = { navController.popBackStack() }
             )
         }
 
@@ -281,7 +326,27 @@ fun AppRoot(
             )
         }
 
-        composable("player") {
+        composable(
+            route = "player",
+            enterTransition = {
+                fadeIn(animationSpec = tween(320)) + slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(320)
+                )
+            },
+            exitTransition = {
+                fadeOut(animationSpec = tween(260))
+            },
+            popEnterTransition = {
+                fadeIn(animationSpec = tween(260))
+            },
+            popExitTransition = {
+                fadeOut(animationSpec = tween(260)) + slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(260)
+                )
+            }
+        ) {
             PlayerScreen(
                 viewModel = playerViewModel,
                 onBackClick = { navController.popBackStack() },

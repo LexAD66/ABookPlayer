@@ -11,16 +11,17 @@
 | Android Auto | Auto-Modus, MediaLibraryService-Browsing, app-lokale Skip-Icons. |
 | Fortschritts-Sync | Optionaler WebDAV-Abgleich. |
 | Bibliothekswartung | Duplikat-/Orphan-Cleanup inkl. leerer `imported_*`-Ordner; keine „(Edition)"-Klon-Schleife mehr. |
+| Library-UI-Redesign (Phase 20) | Top-Bar entschlackt, Filter- & Add-Bottom-Sheet, `library_management`-Screen, Zerlegung `LibraryScreen.kt`. |
+| Release-Härtung & R8/ProGuard | R8/Minify & Resource-Shrinking aktiv (`isMinifyEnabled = true`, `isShrinkResources = true`), `proguard-rules.pro` für Room, Media3, Coil, Kotlinx Serialization, Widgets und Domain-Modelle verifiziert. |
+| Room-Migrationstests | Automatisierte Migrationstests für alle Schema-Stufen v3→v11 (`DatabaseMigrationTest.kt`). |
+| UI-Animationen & Transitions | Flüssige NavHost-Übergänge (Slide-Up/Down für Player Stage, horizontale Slides für Details/Settings/Management). |
+| Instrumentation-Tests (`androidTest/`) | AndroidX Compose UI-Tests aufgesetzt (`AudiobookCardTest.kt`), TestRunner und Manifest konfiguriert. |
+| Tablet- & Foldable-UX (Phase 23) | Adaptives 2-Spalten-Layout (Split View) für Details, Statistiken & Library; responsive adaptive Grid-Spalten (`GridCells.Adaptive`) mit Series-Span-Unterstützung. |
 
 ## Offen
 
 | Priorität | Thema | Inhalt |
 | --- | --- | --- |
-| P0 | Library-UI-Umbau (Phase 20, Teil B) | Top-Bar entschlacken, Filter- und Add-Bottom-Sheet, eigener `library_management`-Screen, Zerlegung von `LibraryScreen.kt`. Siehe [`../ABookPlayer/redesign.md`](../ABookPlayer/redesign.md). |
-| P1 | Serienansicht als Modus | Nur bei „Sortierung = Serien" als eigener Navigationsmodus behandeln. |
-| P1 | UX-Feinschliff | Empty States, Fortschrittsanzeige für Scan/Cleanup (`isScanning`/`isCleaning` an die UI binden), Tablet-Layouts. |
-| P2 | Release-Härtung | R8/Minify für den Release-Build aktivieren und ProGuard-Regeln verifizieren; Migrationstests ergänzen. |
-| P2 | Instrumentation-Tests | SAF-Import, MediaSessionService und Prozessneustart als `androidTest`. |
 | Später | Wear OS | Nicht geplant. |
 
 ---

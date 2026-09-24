@@ -3,6 +3,11 @@ package de.f_soft_studio.abookplayer.ui.library
 import android.content.res.Configuration
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,11 +53,13 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -123,6 +130,7 @@ fun LibraryScreen(
     val isGridView by viewModel.isGridView.collectAsState()
     val selectedBookIds by viewModel.selectedBookIds.collectAsState()
     val favoriteBookIds by viewModel.favoriteBookIds.collectAsState()
+    val maintenanceState by viewModel.maintenanceState.collectAsState()
     val isMultiSelectActive = selectedBookIds.isNotEmpty()
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -534,6 +542,8 @@ fun LibraryScreen(
                         currentAudiobook = currentAudiobook,
                         isMultiSelectActive = isMultiSelectActive,
                         seriesDisplayMode = seriesDisplayMode,
+                        isScanning = maintenanceState.isScanning,
+                        scanProgressText = maintenanceState.scanProgressText,
                         onAudiobookSelected = onAudiobookSelected,
                         onOpenDetails = onOpenDetails,
                         onResetFilters = {
@@ -554,6 +564,58 @@ fun LibraryScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
+                // Linearer Ladebalken während Scan-Aktivität
+                if (maintenanceState.isScanning) {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                }
+
+                // Sichtbares Scan-Statusbanner
+                AnimatedVisibility(
+                    visible = maintenanceState.isScanning,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        tonalElevation = 4.dp
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.5.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = maintenanceState.scanProgressText ?: "Bibliothek wird gescannt...",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    text = "Dateien und Kapitel werden analysiert...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Suchfeld (wenn aktiv ausgeklappt oder Suchtext vorhanden)
                 if (isSearchFieldVisible || searchQuery.isNotBlank()) {
                     OutlinedTextField(
@@ -691,6 +753,8 @@ fun LibraryScreen(
                     currentAudiobook = currentAudiobook,
                     isMultiSelectActive = isMultiSelectActive,
                     seriesDisplayMode = seriesDisplayMode,
+                    isScanning = maintenanceState.isScanning,
+                    scanProgressText = maintenanceState.scanProgressText,
                     onAudiobookSelected = onAudiobookSelected,
                     onOpenDetails = onOpenDetails,
                     onResetFilters = {
@@ -719,6 +783,8 @@ private fun LibraryContent(
     currentAudiobook: Audiobook?,
     isMultiSelectActive: Boolean,
     seriesDisplayMode: SeriesDisplayMode,
+    isScanning: Boolean = false,
+    scanProgressText: String? = null,
     onAudiobookSelected: (Audiobook) -> Unit,
     onOpenDetails: (Audiobook) -> Unit,
     onResetFilters: () -> Unit,
@@ -736,73 +802,97 @@ private fun LibraryContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(24.dp)
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-                    modifier = Modifier.size(80.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(44.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = if (searchQuery.isNotBlank()) {
-                        "Keine Treffer für '$searchQuery'"
-                    } else if (isAnyFilterActive) {
-                        "Keine Hörbücher für diesen Filter"
-                    } else {
-                        "Deine Bibliothek ist noch leer"
-                    },
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = if (isAnyFilterActive) {
-                        "Versuche deine Filterkriterien anzupassen oder zurückzusetzen."
-                    } else {
-                        "Importiere Ordner oder Dateien (.abook, .zip, .m4b) über den Hinzufügen-Button."
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-                Spacer(modifier = Modifier.height(20.dp))
-
-                if (isAnyFilterActive) {
-                    OutlinedButton(
-                        onClick = onResetFilters,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.RestartAlt,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Filter zurücksetzen")
-                    }
+                if (isScanning) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(56.dp),
+                        strokeWidth = 4.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        text = scanProgressText ?: "Bibliothek wird gescannt...",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Hörbücher werden gesucht & analysiert. Bitte einen Moment Geduld...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
                 } else {
-                    Button(
-                        onClick = onOpenAddSheet,
-                        shape = RoundedCornerShape(12.dp)
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                        modifier = Modifier.size(80.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Hörbücher hinzufügen")
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(44.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = if (searchQuery.isNotBlank()) {
+                            "Keine Treffer für '$searchQuery'"
+                        } else if (isAnyFilterActive) {
+                            "Keine Hörbücher für diesen Filter"
+                        } else {
+                            "Deine Bibliothek ist noch leer"
+                        },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = if (isAnyFilterActive) {
+                            "Versuche deine Filterkriterien anzupassen oder zurückzusetzen."
+                        } else {
+                            "Importiere Ordner oder Dateien (.abook, .zip, .m4b) über den Hinzufügen-Button."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    if (isAnyFilterActive) {
+                        OutlinedButton(
+                            onClick = onResetFilters,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.RestartAlt,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Filter zurücksetzen")
+                        }
+                    } else {
+                        Button(
+                            onClick = onOpenAddSheet,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Hörbücher hinzufügen")
+                        }
                     }
                 }
             }

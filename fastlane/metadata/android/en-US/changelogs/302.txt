@@ -1,0 +1,7 @@
+Version 2.0.0:
+• Added multi-candidate online metadata & HD cover search via Audible and iTunes.
+• Fixed audiobook switching in player to prevent previous book from continuing.
+• Added dynamic chapter recovery for folder-based audiobooks without database loss.
+• Hardened Room database with cascade protection against accidental chapter wipes.
+• Added Car Mode screen with large touch targets for safer road usage.
+• Upgraded Material 3 UI and enabled R8 code shrinking and optimization.

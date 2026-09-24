@@ -323,7 +323,10 @@ class LibraryViewModel(
     fun scanAudiobooks() {
         if (_maintenanceState.value.isScanning) return
         viewModelScope.launch {
-            _maintenanceState.value = _maintenanceState.value.copy(isScanning = true)
+            _maintenanceState.value = _maintenanceState.value.copy(
+                isScanning = true,
+                scanProgressText = "Bibliothek wird durchsucht..."
+            )
             try {
                 storage.clearDetectedDuplicates()
                 val imported = storage.scanAndImport()
@@ -345,34 +348,69 @@ class LibraryViewModel(
                 _maintenanceState.value = _maintenanceState.value.copy(lastScanMessage = message)
                 _messageEvent.emit(message)
             } finally {
-                _maintenanceState.value = _maintenanceState.value.copy(isScanning = false)
+                _maintenanceState.value = _maintenanceState.value.copy(
+                    isScanning = false,
+                    scanProgressText = null
+                )
             }
         }
     }
 
     fun importFromUri(uri: android.net.Uri) {
+        if (_maintenanceState.value.isScanning) return
         viewModelScope.launch {
-            val result = storage.importFromUri(uri)
-            _maintenanceState.value = _maintenanceState.value.copy(duplicates = storage.getDetectedDuplicates())
-            if (result != null) {
-                _messageEvent.emit("Hörbuch '${result.title}' erfolgreich importiert")
-            } else {
-                _messageEvent.emit("Fehler beim Importieren der Datei")
+            _maintenanceState.value = _maintenanceState.value.copy(
+                isScanning = true,
+                scanProgressText = "Datei wird importiert..."
+            )
+            try {
+                val result = storage.importFromUri(uri)
+                _maintenanceState.value = _maintenanceState.value.copy(duplicates = storage.getDetectedDuplicates())
+                if (result != null) {
+                    _messageEvent.emit("Hörbuch '${result.title}' erfolgreich importiert")
+                } else {
+                    _messageEvent.emit("Fehler beim Importieren der Datei")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _messageEvent.emit("Import fehlgeschlagen: ${e.message}")
+            } finally {
+                _maintenanceState.value = _maintenanceState.value.copy(
+                    isScanning = false,
+                    scanProgressText = null
+                )
             }
         }
     }
 
     fun importFromFolderUri(uri: android.net.Uri) {
+        if (_maintenanceState.value.isScanning) return
         viewModelScope.launch {
-            storage.clearDetectedDuplicates()
-            val count = storage.importFromFolderUri(uri)
-            _maintenanceState.value = _maintenanceState.value.copy(duplicates = storage.getDetectedDuplicates())
-            if (count > 0) {
-                _messageEvent.emit("$count Hörbuch(er) erfolgreich aus Ordner importiert")
-            } else if (_maintenanceState.value.duplicates.isNotEmpty()) {
-                _messageEvent.emit("${_maintenanceState.value.duplicates.size} identische(s) Duplikat(e) gefunden")
-            } else {
-                _messageEvent.emit("Keine neuen Hörbücher im ausgewählten Ordner gefunden.")
+            _maintenanceState.value = _maintenanceState.value.copy(
+                isScanning = true,
+                scanProgressText = "Ordner wird analysiert..."
+            )
+            try {
+                storage.clearDetectedDuplicates()
+                val count = storage.importFromFolderUri(uri)
+                _maintenanceState.value = _maintenanceState.value.copy(duplicates = storage.getDetectedDuplicates())
+                if (count > 0) {
+                    _messageEvent.emit("$count Hörbuch(er) erfolgreich aus Ordner importiert")
+                } else if (_maintenanceState.value.duplicates.isNotEmpty()) {
+                    _messageEvent.emit("${_maintenanceState.value.duplicates.size} identische(s) Duplikat(e) gefunden")
+                } else {
+                    _messageEvent.emit("Keine neuen Hörbücher im ausgewählten Ordner gefunden.")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _messageEvent.emit("Ordner-Import fehlgeschlagen: ${e.message}")
+            } finally {
+                _maintenanceState.value = _maintenanceState.value.copy(
+                    isScanning = false,
+                    scanProgressText = null
+                )
             }
         }
     }

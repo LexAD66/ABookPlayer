@@ -21,15 +21,28 @@ interface AudiobookDao {
     @Query("SELECT * FROM audiobooks WHERE id = :id LIMIT 1")
     suspend fun getAudiobookById(id: Long): AudiobookEntity?
 
+    @Query("SELECT * FROM audiobooks WHERE title LIKE '%' || :query || '%' OR author LIKE '%' || :query || '%' ORDER BY lastPlayed DESC")
+    suspend fun searchAudiobooks(query: String): List<AudiobookEntity>
+
     @Query("SELECT * FROM audiobooks WHERE id = :id LIMIT 1")
     fun getAudiobookByIdFlow(id: Long): Flow<AudiobookEntity?>
 
+    /**
+     * Fügt ein neues Hörbuch ein.
+     *
+     * ACHTUNG: Bei existierender ID triggert REPLACE ein SQLite-Delete und damit
+     * die Fremdschlüssel-Kaskade (CASCADE DELETE) auf [ChapterEntity]!
+     * Für existierende Hörbücher MUSS [updateAudiobook] verwendet werden.
+     */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAudiobook(audiobook: AudiobookEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAudiobooks(audiobooks: List<AudiobookEntity>)
 
+    /**
+     * Aktualisiert ein bestehendes Hörbuch gezielt ohne Kaskaden-Effekt auf Kind-Tabellen.
+     */
     @Update
     suspend fun updateAudiobook(audiobook: AudiobookEntity)
 

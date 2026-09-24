@@ -25,12 +25,18 @@ val DarkStageColorScheme = darkColorScheme(
     onPrimary = OnDarkPrimary,
     primaryContainer = DarkSurfaceVariant,
     onPrimaryContainer = PrimaryAmberLight,
+    secondary = PrimaryAmberLight,
+    onSecondary = OnDarkPrimary,
+    secondaryContainer = Color(0xFF3B3322),
+    onSecondaryContainer = PrimaryAmberLight,
     background = DarkBackground,
     onBackground = Color.White,
     surface = DarkSurface,
     onSurface = Color.White,
     surfaceVariant = DarkSurfaceVariant,
-    onSurfaceVariant = Color.LightGray
+    onSurfaceVariant = Color.LightGray,
+    outline = Color(0xFF494A54),
+    outlineVariant = Color(0xFF2B2C36)
 )
 
 val ForestMossColorScheme = darkColorScheme(
@@ -38,12 +44,16 @@ val ForestMossColorScheme = darkColorScheme(
     onPrimary = Color.Black,
     primaryContainer = ForestSurfaceVariant,
     onPrimaryContainer = PrimaryEmeraldLight,
+    secondary = PrimaryEmeraldLight,
+    onSecondary = Color(0xFF00391A),
     background = ForestOledBackground,
     onBackground = Color.White,
     surface = ForestSurface,
     onSurface = Color.White,
     surfaceVariant = ForestSurfaceVariant,
-    onSurfaceVariant = Color.LightGray
+    onSurfaceVariant = Color.LightGray,
+    outline = Color(0xFF384E3C),
+    outlineVariant = ForestSurfaceVariant
 )
 
 val MidnightVioletColorScheme = darkColorScheme(
@@ -51,25 +61,35 @@ val MidnightVioletColorScheme = darkColorScheme(
     onPrimary = Color.White,
     primaryContainer = VioletSurfaceVariant,
     onPrimaryContainer = PrimaryNeonVioletLight,
+    secondary = PrimaryNeonVioletLight,
+    onSecondary = Color(0xFF24005A),
     background = VioletSpaceBackground,
     onBackground = Color.White,
     surface = VioletSurface,
     onSurface = Color.White,
     surfaceVariant = VioletSurfaceVariant,
-    onSurfaceVariant = Color.LightGray
+    onSurfaceVariant = Color.LightGray,
+    outline = Color(0xFF4D4375),
+    outlineVariant = VioletSurfaceVariant
 )
 
 val WarmPaperColorScheme = lightColorScheme(
     primary = PrimaryAmber,
-    onPrimary = Color.White,
+    onPrimary = WarmTextPrimary, // Hoher Kontrast für WCAG 2.1 AA (dunkles Espresso auf Bernstein)
     primaryContainer = WarmCardBorder,
     onPrimaryContainer = WarmTextPrimary,
+    secondary = Color(0xFF8C6D46),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFF3E7D7),
+    onSecondaryContainer = WarmTextPrimary,
     background = WarmBackground,
     onBackground = WarmTextPrimary,
     surface = WarmSurface,
     onSurface = WarmTextPrimary,
     surfaceVariant = WarmCardBorder,
-    onSurfaceVariant = WarmTextSecondary
+    onSurfaceVariant = WarmTextSecondary,
+    outline = Color(0xFF8A7F75),
+    outlineVariant = WarmCardBorder
 )
 
 /**

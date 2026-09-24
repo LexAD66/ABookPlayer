@@ -1,0 +1,7 @@
+Version 2.0.0:
+• Neue Online-Metadatensuche via Audible & iTunes mit Auswahldialog und Cover-Vorschau.
+• Zuverlässiger Hörbuchwechsel im Player ohne Weiterspielen des vorherigen Buchs.
+• Automatische dynamische Kapitel-Wiederherstellung für Ordner-Hörbücher.
+• Kaskaden-Schutz in der Room-Datenbank gegen unabsichtlichen Kapitelverlust.
+• Car Mode mit optimierter Großtasten-Steuerung für sicheres Fahren.
+• Leistungsstarkes R8-Code-Shrinking und modernisierte Material-3-Komponenten.

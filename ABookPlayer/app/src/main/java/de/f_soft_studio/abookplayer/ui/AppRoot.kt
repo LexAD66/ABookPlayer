@@ -138,11 +138,15 @@ fun AppRoot(
                 onSkip10sForward = { playbackController.skip10SecondsForward() },
                 onOpenPlayer = { navController.navigate("player") },
                 onAudiobookSelected = { book ->
-                    scope.launch {
-                        val chapterList = repository.getChaptersForAudiobook(book.id).first()
-                        playerViewModel.loadAudiobook(book, chapterList)
+                    if (currentAudiobook?.id == book.id) {
+                        navController.navigate("player")
+                    } else {
+                        scope.launch {
+                            val chapterList = repository.getChaptersForAudiobook(book.id).first()
+                            playerViewModel.loadAudiobook(book, chapterList)
+                        }
+                        navController.navigate("player")
                     }
-                    navController.navigate("player")
                 },
                 onOpenDetails = { book ->
                     selectedBookForDetails = book
@@ -203,11 +207,18 @@ fun AppRoot(
                 isSearchingOnline = isSearchingOnline,
                 onPlayClick = {
                     book?.let { b ->
-                        scope.launch {
-                            val chapterList = repository.getChaptersForAudiobook(b.id).first()
-                            playerViewModel.loadAudiobook(b, chapterList)
+                        if (currentAudiobook?.id == b.id) {
+                            if (!isPlaying) {
+                                playbackController.play()
+                            }
+                            navController.navigate("player")
+                        } else {
+                            scope.launch {
+                                val chapterList = repository.getChaptersForAudiobook(b.id).first()
+                                playerViewModel.loadAudiobook(b, chapterList)
+                            }
+                            navController.navigate("player")
                         }
-                        navController.navigate("player")
                     }
                 },
                 onExportToUri = { uri ->
@@ -232,15 +243,19 @@ fun AppRoot(
                             try {
                                 val scraper = de.f_soft_studio.abookplayer.storage.OnlineCoverScraper(context)
                                 val result = scraper.searchCoverAndMetadata(book.title, book.author)
-                                if (result != null && (!result.coverPath.isNullOrBlank() || !result.description.isNullOrBlank())) {
-                                    repository.updateCoverAndDescription(book.id, result.coverPath, result.description)
-                                    val updated = repository.getAudiobookById(book.id)
-                                    if (updated != null) {
-                                        selectedBookForDetails = updated
-                                    }
-                                    android.widget.Toast.makeText(context, "Cover & Info via ${result.providerName} gefunden!", android.widget.Toast.LENGTH_SHORT).show()
+                                if (result != null && (!result.coverPath.isNullOrBlank() || !result.description.isNullOrBlank() || !result.narrator.isNullOrBlank() || !result.series.isNullOrBlank())) {
+                                    val updatedBook = book.copy(
+                                        coverUri = result.coverPath ?: book.coverUri,
+                                        description = result.description ?: book.description,
+                                        narrator = if (book.narrator.isNullOrBlank()) result.narrator ?: book.narrator else book.narrator,
+                                        series = if (book.series.isNullOrBlank()) result.series ?: book.series else book.series,
+                                        seriesOrder = if (book.seriesOrder == null) result.seriesOrder ?: book.seriesOrder else book.seriesOrder
+                                    )
+                                    repository.saveAudiobook(updatedBook)
+                                    selectedBookForDetails = updatedBook
+                                    android.widget.Toast.makeText(context, "Metadaten via ${result.providerName} gefunden!", android.widget.Toast.LENGTH_SHORT).show()
                                 } else {
-                                    android.widget.Toast.makeText(context, "Kein Cover online gefunden.", android.widget.Toast.LENGTH_SHORT).show()
+                                    android.widget.Toast.makeText(context, "Keine Online-Daten gefunden.", android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             } catch (e: Exception) {
                                 android.widget.Toast.makeText(context, "Fehler bei der Online-Suche: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
@@ -304,15 +319,19 @@ fun AppRoot(
                         try {
                             val scraper = de.f_soft_studio.abookplayer.storage.OnlineCoverScraper(context)
                             val result = scraper.searchCoverAndMetadata(b.title, b.author)
-                            if (result != null && (!result.coverPath.isNullOrBlank() || !result.description.isNullOrBlank())) {
-                                repository.updateCoverAndDescription(b.id, result.coverPath, result.description)
-                                val updated = repository.getAudiobookById(b.id)
-                                if (updated != null) {
-                                    selectedBookForDetails = updated
-                                }
-                                android.widget.Toast.makeText(context, "Cover & Info via ${result.providerName} gefunden!", android.widget.Toast.LENGTH_SHORT).show()
+                            if (result != null && (!result.coverPath.isNullOrBlank() || !result.description.isNullOrBlank() || !result.narrator.isNullOrBlank() || !result.series.isNullOrBlank())) {
+                                val updatedBook = b.copy(
+                                    coverUri = result.coverPath ?: b.coverUri,
+                                    description = result.description ?: b.description,
+                                    narrator = if (b.narrator.isNullOrBlank()) result.narrator ?: b.narrator else b.narrator,
+                                    series = if (b.series.isNullOrBlank()) result.series ?: b.series else b.series,
+                                    seriesOrder = if (b.seriesOrder == null) result.seriesOrder ?: b.seriesOrder else b.seriesOrder
+                                )
+                                repository.saveAudiobook(updatedBook)
+                                selectedBookForDetails = updatedBook
+                                android.widget.Toast.makeText(context, "Metadaten via ${result.providerName} gefunden!", android.widget.Toast.LENGTH_SHORT).show()
                             } else {
-                                android.widget.Toast.makeText(context, "Kein Cover online gefunden.", android.widget.Toast.LENGTH_SHORT).show()
+                                android.widget.Toast.makeText(context, "Keine Online-Daten gefunden.", android.widget.Toast.LENGTH_SHORT).show()
                             }
                         } catch (e: Exception) {
                             android.widget.Toast.makeText(context, "Fehler bei der Online-Suche: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()

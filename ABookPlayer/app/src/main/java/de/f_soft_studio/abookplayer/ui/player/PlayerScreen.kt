@@ -33,12 +33,15 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -126,6 +129,7 @@ fun PlayerScreen(
     var showCustomSpeedDialog by remember { mutableStateOf(false) }
     var showChaptersSheet by remember { mutableStateOf(false) }
     var showEqualizerDialog by remember { mutableStateOf(false) }
+    var showPlayerOverflowMenu by remember { mutableStateOf(false) }
     var currentAudioProfile by remember { mutableStateOf(AudioProfile.SPRACHKLARHEIT) }
     val speedOptions = listOf(0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
 
@@ -259,26 +263,62 @@ fun PlayerScreen(
                                     tint = Color.White
                                 )
                             }
-                            IconButton(onClick = onOpenBookmarks) {
-                                Icon(
-                                    imageVector = Icons.Default.Bookmark,
-                                    contentDescription = "Lesezeichen",
-                                    tint = Color.White
-                                )
-                            }
-                            IconButton(onClick = onOpenSleepTimer) {
-                                Icon(
-                                    imageVector = Icons.Default.Timer,
-                                    contentDescription = "Sleep-Timer",
-                                    tint = Color.White
-                                )
-                            }
-                            IconButton(onClick = onOpenCarMode) {
-                                Icon(
-                                    imageVector = Icons.Default.DirectionsCar,
-                                    contentDescription = "Auto-Modus",
-                                    tint = Color.White
-                                )
+                            // M3 Overflow-Menü für sekundäre Aktionen
+                            Box {
+                                IconButton(onClick = { showPlayerOverflowMenu = true }) {
+                                    Icon(
+                                        imageVector = Icons.Default.MoreVert,
+                                        contentDescription = "Weitere Optionen",
+                                        tint = Color.White
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = showPlayerOverflowMenu,
+                                    onDismissRequest = { showPlayerOverflowMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Lesezeichen") },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Bookmark,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        },
+                                        onClick = {
+                                            showPlayerOverflowMenu = false
+                                            onOpenBookmarks()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Sleep-Timer") },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Timer,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        },
+                                        onClick = {
+                                            showPlayerOverflowMenu = false
+                                            onOpenSleepTimer()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Auto-Modus") },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.DirectionsCar,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        },
+                                        onClick = {
+                                            showPlayerOverflowMenu = false
+                                            onOpenCarMode()
+                                        }
+                                    )
+                                }
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -416,19 +456,21 @@ fun PlayerScreen(
                             ) {
                                 IconButton(
                                     onClick = { viewModel.skipPreviousChapter() },
-                                    modifier = Modifier.size(40.dp)
+                                    modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.SkipPrevious,
                                         contentDescription = "Vorheriges Kapitel",
                                         tint = Color.White,
-                                        modifier = Modifier.size(26.dp)
+                                        modifier = Modifier.size(28.dp)
                                     )
                                 }
 
                                 IconButton(
                                     onClick = { viewModel.skip10sBackward() },
-                                    modifier = Modifier.size(44.dp)
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clearAndSetSemantics { contentDescription = "10 Sekunden zurückspulen" }
                                 ) {
                                     Text(
                                         text = "-10s",
@@ -441,7 +483,7 @@ fun PlayerScreen(
                                 IconButton(
                                     onClick = { viewModel.togglePlayPause() },
                                     modifier = Modifier
-                                        .size(60.dp)
+                                        .size(64.dp)
                                         .clip(CircleShape)
                                         .background(MaterialTheme.colorScheme.primary)
                                 ) {
@@ -455,7 +497,9 @@ fun PlayerScreen(
 
                                 IconButton(
                                     onClick = { viewModel.skip10sForward() },
-                                    modifier = Modifier.size(44.dp)
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clearAndSetSemantics { contentDescription = "10 Sekunden vorspulen" }
                                 ) {
                                     Text(
                                         text = "+10s",
@@ -467,13 +511,13 @@ fun PlayerScreen(
 
                                 IconButton(
                                     onClick = { viewModel.skipNextChapter() },
-                                    modifier = Modifier.size(40.dp)
+                                    modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.SkipNext,
                                         contentDescription = "Nächstes Kapitel",
                                         tint = Color.White,
-                                        modifier = Modifier.size(26.dp)
+                                        modifier = Modifier.size(28.dp)
                                     )
                                 }
                             }
@@ -591,7 +635,7 @@ fun PlayerScreen(
                         ) {
                             IconButton(
                                 onClick = { viewModel.skipPreviousChapter() },
-                                modifier = Modifier.size(44.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.SkipPrevious,
@@ -603,7 +647,9 @@ fun PlayerScreen(
 
                             IconButton(
                                 onClick = { viewModel.skip10sBackward() },
-                                modifier = Modifier.size(48.dp)
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clearAndSetSemantics { contentDescription = "10 Sekunden zurückspulen" }
                             ) {
                                 Text(
                                     text = "-10s",
@@ -630,7 +676,9 @@ fun PlayerScreen(
 
                             IconButton(
                                 onClick = { viewModel.skip30sForward() },
-                                modifier = Modifier.size(48.dp)
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clearAndSetSemantics { contentDescription = "30 Sekunden vorspulen" }
                             ) {
                                 Text(
                                     text = "+30s",
@@ -642,7 +690,7 @@ fun PlayerScreen(
 
                             IconButton(
                                 onClick = { viewModel.skipNextChapter() },
-                                modifier = Modifier.size(44.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.SkipNext,

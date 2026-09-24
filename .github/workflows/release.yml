@@ -1,0 +1,49 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x ABookPlayer/gradlew
+
+      - name: Run Unit Tests
+        run: |
+          cd ABookPlayer
+          ./gradlew test --stacktrace
+
+      - name: Assemble Release APK
+        run: |
+          cd ABookPlayer
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "ABook Player ${{ github.ref_name }}"
+          body_path: fastlane/metadata/android/de-DE/changelogs/302.txt
+          draft: false
+          prerelease: false
+          files: |
+            ABookPlayer/app/build/outputs/apk/release/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

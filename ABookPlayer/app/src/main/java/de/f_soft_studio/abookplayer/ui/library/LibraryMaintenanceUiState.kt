@@ -11,6 +11,7 @@ import de.f_soft_studio.abookplayer.util.DuplicateMatch
 data class LibraryMaintenanceUiState(
     val isScanning: Boolean = false,
     val isCleaning: Boolean = false,
+    val scanProgressText: String? = null,
     val lastScanMessage: String? = null,
     val duplicates: List<DuplicateMatch> = emptyList(),
     val cleanupResult: LibraryCleanupResult? = null

@@ -12,6 +12,12 @@ class SaveProgressUseCase(
 ) {
     private val lastRecordedPositionMap = mutableMapOf<Long, Long>()
 
+    /**
+     * Speichert den aktuellen Fortschritt und verbucht die abgespielte Zeit in den Statistiken.
+     *
+     * @param audiobookId ID des aktiven Hörbuchs.
+     * @param currentPosition Aktuelle Abspielposition in Millisekunden.
+     */
     suspend operator fun invoke(audiobookId: Long, currentPosition: Long) {
         val lastPos = lastRecordedPositionMap[audiobookId]
         if (lastPos != null && currentPosition > lastPos) {

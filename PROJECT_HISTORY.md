@@ -46,6 +46,16 @@ Diese Datei dokumentiert alle **abgeschlossenen Fortschritte** sowie alle **gepl
 - [x] **2-Spalten-Split in Statistiken:** `StatisticsScreen.kt` ordnet Kennzahlen (2x2) und das 7-Tage-Aktivitätsdiagramm auf breiten Displays nebeneinander an.
 - [x] **Querformat & Foldables:** Optimierte Nutzung der Bildschirmbreite über `LocalConfiguration` und sauberes Scrollverhalten.
 
+### ✅ Phase 24: Online-Metadaten (Audible/iTunes), Cover-Auswahl, Player-Fix, Release 2.0.0 (F-Droid & GitHub) & KI-Dokumentation (abgeschlossen)
+
+- [x] **Online-Metadaten- & Cover-Scraper:** Multi-Provider-Kaskade mit Audible (DE) als primäre Quelle (Sprecher, Serie, Band, HD-Cover) und iTunes Store (DE) als Fallback.
+- [x] **Interaktiver Treffer- & Cover-Auswahldialog:** `MetadataSearchDialog` mit Textsuchfeld, Trefferliste, Live-Cover-Vorschau und Übernahme in den Metadaten-Editor.
+- [x] **Player-Wechsel & Kaskadenschutz:** Behebung des Fehlers beim Hörbuchwechsel (altes Buch spielte weiter) durch Stoppen & Fortschrittssicherung, Vermeidung des SQLite `CASCADE DELETE` auf `chapters` durch `@Update` und dynamische on-the-fly Kapitel-Wiederherstellung bei Ordner-Hörbüchern.
+- [x] **F-Droid Release Vorbereitung:** Fastlane-Metadaten (`fastlane/metadata/android/de-DE` & `en-US`), F-Droid Build-Rezept (`metadata/de.f_soft_studio.abookplayer.yml`), Root-Lizenzdatei (MIT) und Verifikation der 100% FOSS-Compliance.
+- [x] **GitHub Release CI/CD:** GitHub Actions Workflows (`.github/workflows/ci.yml` für CI und `release.yml` für automatische GitHub Releases bei Tags `v*`).
+- [x] **Umfassende Quellcode- & Architektur-Dokumentation:** Vollständige KDoc-Dokumentation der Kernklassen, neues `ARCHITECTURE.md` und aktualisierte `README.md` & `CHANGELOG.md` auf Version 2.0.0.
+- [x] **Nachhaltige KI-Entwicklungsunterstützung:** Neuer `docs/AI_DEVELOPMENT_GUIDE.md` mit Gotchas, Schichtenarchitektur und Arbeitsweisen; Harmonisierung von `AGENTS.md` und `CLAUDE.md`.
+
 ---
 
 ## ✅ Abgeschlossene Aufgaben

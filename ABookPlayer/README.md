@@ -6,14 +6,15 @@ Erstellt für **Android Studio Narwhal 4 Feature Drop | 2025.1.4**.
 ---
 
 ## 📊 Projektstatus
-- **Status:** 🎉 **Version 1.1.0 (Phasen 0–15) vollständig abgeschlossen!**
+- **Status:** 🎉 **Version 2.0.0 (Major Release) vollständig abgeschlossen!**
 - **Build-Status:** 🟢 `BUILD SUCCESSFUL` (Debug & Release APKs, ProGuard/R8 verifiziert)
-- **Test-Status:** 🟢 Unit- & Integrationstests für Storage/Parser, Repository/UseCases, Room-DAOs, ViewModels, SleepTimer, FolderScanner, OpenLibraryScraper & ShakeDetector bestanden.
+- **Test-Status:** 🟢 Alle Unit-, ViewModel-, Storage-, Service- & DAO-Tests bestanden (53 Tests).
+- **F-Droid / FOSS Status:** 🟢 100% quelloffen, Fastlane-Metadaten & F-Droid-Rezept vorhanden.
 
 ---
 
 ## 📚 Projektdokumentation
-Die ausführliche, konsolidierte Projektdokumentation (Kapitel 01–17) befindet sich im Ordner [**Docs/**](Docs/README.md). Sie führt den Antigravity-Plan und die Entwicklungsdokumentation zu einer verbindlichen Fassung zusammen.
+Die ausführliche, konsolidierte Projektdokumentation (Kapitel 01–17) befindet sich im Ordner [**Docs/**](Docs/README.md). Die ganzheitliche Systemarchitektur ist in [`ARCHITECTURE.md`](../ARCHITECTURE.md) beschrieben.
 
 ---
 
@@ -21,18 +22,37 @@ Die ausführliche, konsolidierte Projektdokumentation (Kapitel 01–17) befindet
 - **Projektname:** ABook Player
 - **Paketname:** `de.f_soft_studio.abookplayer`
 - **Entwickler-Domain:** `f-soft-studio.de`
-- **Version:** `1.1.0` (versionCode: `110`)
+- **Version:** `2.0.0` (versionCode: `302`)
 - **Sprache:** Kotlin 2.0.20
 - **Build:** Gradle (AGP 8.5.2), compileSdk/targetSdk 35, minSdk 24, Java 21
 - **Architektur:** Clean Architecture + MVVM (`domain` / `data` / `storage` / `player` / `ui`)
 - **UI:** Jetpack Compose + Material 3 (Compose BOM 2025.01.00), Navigation-Compose
 - **Player:** Media3 1.4.1 (ExoPlayer + MediaSession + MediaLibraryService)
-- **Persistenz:** Room 2.6.1 (Audiobooks, Chapters, Bookmarks, ListeningSessions - DB v6), DataStore Preferences
+- **Persistenz:** Room 2.6.1 (Audiobooks, Chapters, Bookmarks, ListeningSessions, Characters - DB v11), DataStore Preferences
 - **Sonstiges:** Kotlinx Serialization (metadata.json), Coil (Cover-Rendering), Coroutines
 
 ---
 
-## 🌟 Haupt-Features (Release 1.1.0)
+## 📸 Screenshots & Benutzeroberfläche
+
+| Bibliothek (Listenansicht) | Bibliothek (Rasteransicht) | OLED Audioplayer | Kapitelübersicht |
+| :---: | :---: | :---: | :---: |
+| <img src="../docs/screenshots/01_library_list.png" width="220" alt="Bibliothek Liste" /> | <img src="../docs/screenshots/02_library_grid.png" width="220" alt="Bibliothek Raster" /> | <img src="../docs/screenshots/03_player.png" width="220" alt="OLED Player" /> | <img src="../docs/screenshots/04_chapters.png" width="220" alt="Kapitelübersicht" /> |
+| *Listenansicht mit Mini-Player* | *2-Spalten-Raster mit Cover-Art* | *Reinschwarz (#000000) Stage* | *Live-Wellenform am aktiven Track* |
+
+| Sound & Equalizer | Wiedergabetempo | Player-Menü | Hörbuch-Details |
+| :---: | :---: | :---: | :---: |
+| <img src="../docs/screenshots/05_equalizer.png" width="220" alt="Sound & Equalizer" /> | <img src="../docs/screenshots/06_speed.png" width="220" alt="Wiedergabetempo" /> | <img src="../docs/screenshots/07_player_menu.png" width="220" alt="Player Optionen" /> | <img src="../docs/screenshots/08_details.png" width="220" alt="Hörbuch Details" /> |
+| *Boost, Stille überspringen & Presets* | *0.75x–2.0x & Stufenlos* | *Sleep-Timer, Lesezeichen & Auto* | *Metadaten, Figuren & Export* |
+
+| Online-Metadatensuche | Metadaten-Editor | Technische Spezifikationen |
+| :---: | :---: | :---: |
+| <img src="../docs/screenshots/09_metadata_search.png" width="220" alt="Online-Metadatensuche" /> | <img src="../docs/screenshots/10_metadata_edit.png" width="220" alt="Metadaten bearbeiten" /> | <img src="../docs/screenshots/11_technical_info.png" width="220" alt="Technische Spezifikationen" /> |
+| *Audible & iTunes Live-Suche* | *Reihen-, Band- & Sprecher-Editor* | *.abook Container & Audio-Encoding* |
+
+---
+
+## 🌟 Haupt-Features (Release 2.0.0)
 1. **.abook-Format Import & Kanonischer Export:** Abspielen von `.abook`-Dateien (ZIP mit Audio-Dateien + `metadata.json`), automatisches atomares Entpacken in den App-Cache mit Zip-Bomb & Zip-Slip Protection sowie SAF Export.
 2. **Smarter Ordner-Scanner:** automatischer Scan entpackter Ordnerstrukturen & intelligente CD-Zusammenführung (`CD1`, `CD2`, `Disc 1` usw.) zu einem einzigen Hörbuch inklusive Duplikaterkennung.
 3. **Formatunterstützung:** MP3, M4A, OGG, FLAC, AAC, WAV.
@@ -40,9 +60,9 @@ Die ausführliche, konsolidierte Projektdokumentation (Kapitel 01–17) befindet
 5. **OLED True Black Theme & Paper Look:** Warmes Bibliotheks-Design (Material 3 Paper-Look) & stromsparendes Reinschwarz-Design für den Player Stage Screen.
 6. **Sleep Timer & Shake to Extend:** Abschalttimer (15m, 30m, 45m, 60m, am Kapitelende) & Schütteln des Geräts zur automatischen Verlängerung (+15 Min.).
 7. **Lokale Hörstatistiken:** Tägliche/wöchentliche Auswertung & Streaks (100% datenschutzfreundlich, Canvas 7-Tage-Balkendiagramm).
-8. **Serien-Verwaltung & OpenLibrary Scraper:** Reihen-Verwaltung (`series` & `seriesOrder`), Metadaten-Editor Dialog & automatischer Cover-Download via OpenLibrary API.
+8. **Serien-Verwaltung, Audible- & iTunes-Scraper:** Reihen-Verwaltung (`series` & `seriesOrder`), Metadaten-Editor Dialog & automatischer Metadaten- und Cover-Download via Audible & iTunes API.
 9. **Bibliotheks-Usability & Multi-Select:** Stapelverarbeitung für Favoritisierung/Löschen, Sprecher-Suche, neue Sortierungen (*Restlaufzeit*, *Hinzugefügt am*).
-10. **Komfort-Funktionen:** Android Homescreen Widget, Stille überspringen (Skip Silence) & Mehrsprachigkeit (DE/EN).
+10. **Komfort-Funktionen:** Android Homescreen Widget, Stille überspringen (Skip Silence), Equalizer / Lautstärke-Boost & Mehrsprachigkeit (DE/EN).
 
 ---
 

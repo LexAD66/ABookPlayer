@@ -18,18 +18,23 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.CommandButton
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaLibraryService.LibraryParams
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
+import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
 import de.f_soft_studio.abookplayer.MainActivity
 import de.f_soft_studio.abookplayer.R
+import de.f_soft_studio.abookplayer.data.repository.AudiobookRepository
 import de.f_soft_studio.abookplayer.domain.model.Audiobook
 import de.f_soft_studio.abookplayer.domain.model.Chapter
 import de.f_soft_studio.abookplayer.domain.usecase.SaveProgressUseCase
 import de.f_soft_studio.abookplayer.player.service.AbookPlaybackService
+import de.f_soft_studio.abookplayer.storage.FolderScanner
 import de.f_soft_studio.abookplayer.util.AudiobookMetadataText
 import de.f_soft_studio.abookplayer.util.PlayableMedia
 import kotlinx.coroutines.CoroutineScope
@@ -46,12 +51,57 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.io.File
 
+/**
+ * Zentraler Audio-Playback-Controller für den ABook Player.
+ *
+ * Verwaltet den [ExoPlayer]-Lebenszyklus, Media3-[MediaLibrarySession], Audio-Attribute,
+ * die Umwandlung von Domain-Hörbüchern und Kapiteln in [MediaItem]-Playlisten,
+ * präzises Seeking, intelligenten Rücksprung (Smart Rewind) und das automatische
+ * Speichern des Fortschritts.
+ *
+ * Besondere Architekturschwerpunkte:
+ * - Saubere Trennung von UI und Player via [StateFlow] und [SharedFlow].
+ * - Atomarer Wechsel zwischen Hörbüchern: Das alte Hörbuch wird vor dem Wechsel gestoppt,
+ *   sein exakter Fortschritt persistiert und anschließend die neue Playlist vorbereitet.
+ * - Dynamische Kapitelrekonstruktion: Falls ein Hörbuch in der Datenbank keine Kapitel besitzt,
+ *   scannt der Controller den Dateiordner automatisch und stellt die Playlist on-the-fly her.
+ * - Unterstützung sowohl lokaler Dateipfade als auch Android Storage Access Framework (SAF) `content://` URIs.
+ *
+ * @param context Android-Anwendungskontext.
+ * @param saveProgressUseCase UseCase zur persistierten Verbuchung des Fortschritts & Hörstatistiken.
+ * @param customRepository Optionales injiziertes Repository (z. B. für Unit-Tests).
+ */
 class PlaybackController(
     private val context: Context,
-    private val saveProgressUseCase: SaveProgressUseCase
+    private val saveProgressUseCase: SaveProgressUseCase,
+    private val customRepository: AudiobookRepository? = null
 ) {
     private val scope = CoroutineScope(Dispatchers.Main)
     private var lastPauseTimestamp: Long = 0L
+
+    private val repository: AudiobookRepository by lazy {
+        customRepository ?: run {
+            val db = de.f_soft_studio.abookplayer.data.local.db.AbookDatabase.getInstance(context)
+            AudiobookRepository(
+                audiobookDao = db.audiobookDao(),
+                chapterDao = db.chapterDao(),
+                bookmarkDao = db.bookmarkDao(),
+                listeningSessionDao = db.listeningSessionDao()
+            )
+        }
+    }
+
+    private fun <T> future(block: suspend () -> T): ListenableFuture<T> {
+        val future = SettableFuture.create<T>()
+        scope.launch {
+            try {
+                future.set(block())
+            } catch (e: Throwable) {
+                future.setException(e)
+            }
+        }
+        return future
+    }
 
     private val _seekIncrementMs = MutableStateFlow(10_000L)
     val seekIncrementMs: StateFlow<Long> = _seekIncrementMs.asStateFlow()
@@ -189,6 +239,217 @@ class PlaybackController(
                     }
                     return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                 }
+
+                override fun onGetLibraryRoot(
+                    session: MediaLibrarySession,
+                    controller: MediaSession.ControllerInfo,
+                    params: LibraryParams?
+                ): ListenableFuture<LibraryResult<MediaItem>> {
+                    val rootMetadata = MediaMetadata.Builder()
+                        .setTitle("ABook Player")
+                        .setIsBrowsable(true)
+                        .setIsPlayable(false)
+                        .setFolderType(MediaMetadata.FOLDER_TYPE_MIXED)
+                        .build()
+                    val rootItem = MediaItem.Builder()
+                        .setMediaId(MEDIA_ROOT_ID)
+                        .setMediaMetadata(rootMetadata)
+                        .build()
+                    return Futures.immediateFuture(LibraryResult.ofItem(rootItem, params))
+                }
+
+                override fun onGetChildren(
+                    session: MediaLibrarySession,
+                    controller: MediaSession.ControllerInfo,
+                    parentId: String,
+                    page: Int,
+                    pageSize: Int,
+                    params: LibraryParams?
+                ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+                    return future {
+                        try {
+                            val items = when (parentId) {
+                                MEDIA_ROOT_ID -> {
+                                    listOf(
+                                        buildCategoryItem(MEDIA_CAT_RECENT, "Zuletzt gehört", "Zuletzt gehörte Hörbücher"),
+                                        buildCategoryItem(MEDIA_CAT_ALL, "Alle Hörbücher", "Gesamte Bibliothek"),
+                                        buildCategoryItem(MEDIA_CAT_FAVORITES, "Favoriten", "Markierte Favoriten")
+                                    )
+                                }
+                                MEDIA_CAT_RECENT -> {
+                                    val all = repository.getAllAudiobooks().firstOrNull() ?: emptyList()
+                                    all.filter { it.lastPlayed > 0L || it.currentPosition > 0L }
+                                        .take(15)
+                                        .map { buildAudiobookMediaItem(it) }
+                                }
+                                MEDIA_CAT_ALL -> {
+                                    val all = repository.getAllAudiobooks().firstOrNull() ?: emptyList()
+                                    all.sortedBy { it.title.lowercase() }
+                                        .map { buildAudiobookMediaItem(it) }
+                                }
+                                MEDIA_CAT_FAVORITES -> {
+                                    val all = repository.getAllAudiobooks().firstOrNull() ?: emptyList()
+                                    all.filter { it.isFavorite }
+                                        .map { buildAudiobookMediaItem(it) }
+                                }
+                                else -> {
+                                    if (parentId.startsWith(PREFIX_BOOK)) {
+                                        val bookId = parentId.removePrefix(PREFIX_BOOK).toLongOrNull()
+                                        if (bookId != null) {
+                                            val book = repository.getAudiobookById(bookId)
+                                            val chapters = repository.getChaptersForAudiobook(bookId).firstOrNull() ?: emptyList()
+                                            if (book != null && chapters.isNotEmpty()) {
+                                                chapters.map { ch -> buildChapterMediaItem(book, ch) }
+                                            } else emptyList()
+                                        } else emptyList()
+                                    } else emptyList()
+                                }
+                            }
+                            LibraryResult.ofItemList(items, params)
+                        } catch (_: Exception) {
+                            LibraryResult.ofError(LibraryResult.RESULT_ERROR_BAD_VALUE)
+                        }
+                    }
+                }
+
+                override fun onGetItem(
+                    session: MediaLibrarySession,
+                    controller: MediaSession.ControllerInfo,
+                    mediaId: String
+                ): ListenableFuture<LibraryResult<MediaItem>> {
+                    return future {
+                        val item = when {
+                            mediaId == MEDIA_ROOT_ID -> {
+                                MediaItem.Builder()
+                                    .setMediaId(MEDIA_ROOT_ID)
+                                    .setMediaMetadata(
+                                        MediaMetadata.Builder()
+                                            .setTitle("ABook Player")
+                                            .setIsBrowsable(true)
+                                            .setIsPlayable(false)
+                                            .setFolderType(MediaMetadata.FOLDER_TYPE_MIXED)
+                                            .build()
+                                    )
+                                    .build()
+                            }
+                            mediaId == MEDIA_CAT_RECENT -> buildCategoryItem(MEDIA_CAT_RECENT, "Zuletzt gehört", "Zuletzt gehörte Hörbücher")
+                            mediaId == MEDIA_CAT_ALL -> buildCategoryItem(MEDIA_CAT_ALL, "Alle Hörbücher", "Gesamte Bibliothek")
+                            mediaId == MEDIA_CAT_FAVORITES -> buildCategoryItem(MEDIA_CAT_FAVORITES, "Favoriten", "Markierte Favoriten")
+                            mediaId.startsWith(PREFIX_BOOK) -> {
+                                val bookId = mediaId.removePrefix(PREFIX_BOOK).toLongOrNull()
+                                val book = bookId?.let { repository.getAudiobookById(it) }
+                                book?.let { buildAudiobookMediaItem(it) }
+                            }
+                            mediaId.startsWith(PREFIX_CHAPTER) -> {
+                                val parts = mediaId.removePrefix(PREFIX_CHAPTER).split("_")
+                                val bookId = parts.getOrNull(0)?.toLongOrNull()
+                                val chapterId = parts.getOrNull(1)?.toLongOrNull()
+                                if (bookId != null && chapterId != null) {
+                                    val book = repository.getAudiobookById(bookId)
+                                    val chapters = repository.getChaptersForAudiobook(bookId).firstOrNull() ?: emptyList()
+                                    val chapter = chapters.firstOrNull { it.id == chapterId }
+                                    if (book != null && chapter != null) {
+                                        buildChapterMediaItem(book, chapter)
+                                    } else null
+                                } else null
+                            }
+                            else -> null
+                        }
+                        if (item != null) {
+                            LibraryResult.ofItem(item, null)
+                        } else {
+                            LibraryResult.ofError(LibraryResult.RESULT_ERROR_BAD_VALUE)
+                        }
+                    }
+                }
+
+                override fun onSetMediaItems(
+                    session: MediaSession,
+                    controller: MediaSession.ControllerInfo,
+                    mediaItems: MutableList<MediaItem>,
+                    startIndex: Int,
+                    startPositionMs: Long
+                ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+                    return future {
+                        val targetItem = mediaItems.getOrNull(startIndex) ?: mediaItems.firstOrNull()
+                        if (targetItem != null) {
+                            handleMediaItemPlayback(targetItem.mediaId, startPositionMs)
+                        }
+                        val items = (0 until player.mediaItemCount).map { i -> player.getMediaItemAt(i) }
+                        MediaSession.MediaItemsWithStartPosition(
+                            items,
+                            player.currentMediaItemIndex,
+                            if (startPositionMs != androidx.media3.common.C.TIME_UNSET && startPositionMs > 0L) startPositionMs else player.currentPosition
+                        )
+                    }
+                }
+
+                override fun onAddMediaItems(
+                    session: MediaSession,
+                    controller: MediaSession.ControllerInfo,
+                    mediaItems: MutableList<MediaItem>
+                ): ListenableFuture<MutableList<MediaItem>> {
+                    return future {
+                        val target = mediaItems.firstOrNull()
+                        if (target != null) {
+                            handleMediaItemPlayback(target.mediaId, 0L)
+                        }
+                        val currentItems = (0 until player.mediaItemCount).map { i -> player.getMediaItemAt(i) }.toMutableList()
+                        if (currentItems.isNotEmpty()) currentItems else mediaItems
+                    }
+                }
+
+                override fun onPlaybackResumption(
+                    session: MediaSession,
+                    controller: MediaSession.ControllerInfo
+                ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+                    return future {
+                        var book = _currentAudiobook.value
+                        if (book == null) {
+                            val allBooks = repository.getAllAudiobooks().firstOrNull()
+                            book = allBooks?.maxByOrNull { it.lastPlayed } ?: allBooks?.firstOrNull()
+                            if (book != null) {
+                                val chapters = repository.getChaptersForAudiobook(book.id).firstOrNull() ?: emptyList()
+                                loadAudiobook(book, chapters, autoPlay = false)
+                            }
+                        }
+                        val items = (0 until player.mediaItemCount).map { i -> player.getMediaItemAt(i) }
+                        val startPos = if (_currentPosition.value > 0L) _currentPosition.value else (book?.currentPosition ?: 0L)
+                        MediaSession.MediaItemsWithStartPosition(
+                            items,
+                            player.currentMediaItemIndex,
+                            startPos
+                        )
+                    }
+                }
+
+                override fun onSearch(
+                    session: MediaLibrarySession,
+                    controller: MediaSession.ControllerInfo,
+                    query: String,
+                    params: LibraryParams?
+                ): ListenableFuture<LibraryResult<Void>> {
+                    return future {
+                        val results = repository.searchAudiobooks(query)
+                        session.notifySearchResultChanged(controller, query, results.size, params)
+                        LibraryResult.ofVoid(params)
+                    }
+                }
+
+                override fun onGetSearchResult(
+                    session: MediaLibrarySession,
+                    controller: MediaSession.ControllerInfo,
+                    query: String,
+                    page: Int,
+                    pageSize: Int,
+                    params: LibraryParams?
+                ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+                    return future {
+                        val results = repository.searchAudiobooks(query)
+                        val items = results.map { buildAudiobookMediaItem(it) }
+                        LibraryResult.ofItemList(items, params)
+                    }
+                }
             }
 
             mediaSession = MediaLibrarySession.Builder(context, player, libraryCallback)
@@ -295,8 +556,20 @@ class PlaybackController(
      * Lädt ein Hörbuch und seine Kapitel-Playlist und startet optional sofort die Wiedergabe.
      */
     fun loadAudiobook(audiobook: Audiobook, chapterList: List<Chapter> = emptyList(), autoPlay: Boolean = false) {
+        // 1. Falls vorher ein anderes Buch aktiv war: Fortschritt des alten Buchs sichern und Player stoppen
+        val oldBook = _currentAudiobook.value
+        if (oldBook != null && oldBook.id != audiobook.id) {
+            val oldPos = calculateGlobalPosition()
+            scope.launch {
+                try {
+                    saveProgressUseCase(oldBook.id, oldPos)
+                } catch (_: Exception) {}
+            }
+            player.stop()
+            player.clearMediaItems()
+        }
+
         _currentAudiobook.value = audiobook
-        _chapters.value = chapterList
         lastPauseTimestamp = 0L
 
         if (audiobook.customSpeed != null) {
@@ -304,9 +577,27 @@ class PlaybackController(
             applyPlaybackSpeed()
         }
 
+        // 2. Falls keine Kapitel übergeben wurden, versuchen wir Kapitel aus dem Buchordner zu rekonstruieren
+        var effectiveChapters = chapterList
+        if (effectiveChapters.isEmpty() && audiobook.filePath.isNotBlank()) {
+            val bookDir = File(audiobook.filePath)
+            if (bookDir.exists() && bookDir.isDirectory) {
+                val scanned = FolderScanner(context).scanBookFolder(bookDir)
+                if (scanned != null && scanned.chapters.isNotEmpty()) {
+                    effectiveChapters = scanned.chapters.map { it.copy(audiobookId = audiobook.id) }
+                    scope.launch {
+                        try {
+                            repository.saveChapters(effectiveChapters)
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+        }
+        _chapters.value = effectiveChapters
+
         var calculatedDuration = audiobook.duration
-        if (calculatedDuration <= 0L && chapterList.isNotEmpty()) {
-            val lastChapter = chapterList.last()
+        if (calculatedDuration <= 0L && effectiveChapters.isNotEmpty()) {
+            val lastChapter = effectiveChapters.last()
             val lastChapterFile = lastChapter.audioPath?.let { File(it) }
             val lastChapterDur = if (lastChapterFile != null && lastChapterFile.exists()) {
                 de.f_soft_studio.abookplayer.util.ChapterDurations.readDurationMs(lastChapterFile)
@@ -315,7 +606,7 @@ class PlaybackController(
         }
         _duration.value = calculatedDuration
 
-        val distinctAudioPaths = chapterList.mapNotNull { it.audioPath?.ifBlank { null } }.distinct()
+        val distinctAudioPaths = effectiveChapters.mapNotNull { it.audioPath?.ifBlank { null } }.distinct()
         val isMultiFile = distinctAudioPaths.size > 1
 
         val coverFile = audiobook.coverUri?.let {
@@ -359,17 +650,27 @@ class PlaybackController(
             return builder.build()
         }
 
+        fun toMediaUri(path: String): Uri {
+            return if (path.startsWith("content://")) Uri.parse(path) else Uri.fromFile(File(path))
+        }
+
+        fun isPlayable(path: String?): Boolean {
+            if (path.isNullOrBlank()) return false
+            if (path.startsWith("content://")) return true
+            return PlayableMedia.isPlayableFile(path)
+        }
+
         val mediaMetadata = createMetadata()
         val mediaItems = mutableListOf<MediaItem>()
 
         if (isMultiFile) {
-            chapterList.forEach { ch ->
+            effectiveChapters.forEach { ch ->
                 val path = ch.audioPath
-                if (PlayableMedia.isPlayableFile(path)) {
+                if (isPlayable(path)) {
                     val chMetadata = createMetadata(ch)
                     mediaItems.add(
                         MediaItem.Builder()
-                            .setUri(Uri.fromFile(File(path!!)))
+                            .setUri(toMediaUri(path!!))
                             .setMediaMetadata(chMetadata)
                             .build()
                     )
@@ -377,23 +678,21 @@ class PlaybackController(
             }
         } else {
             val singlePath = distinctAudioPaths.firstOrNull() ?: audiobook.filePath
-            if (PlayableMedia.isPlayableFile(singlePath)) {
+            if (isPlayable(singlePath)) {
                 mediaItems.add(
                     MediaItem.Builder()
-                        .setUri(Uri.fromFile(File(singlePath)))
+                        .setUri(toMediaUri(singlePath))
                         .setMediaMetadata(mediaMetadata)
                         .build()
                 )
             }
         }
 
-        // Letzter Fallback: direkter Buchpfad – aber nur, wenn es eine echte Datei ist.
-        // Ein Verzeichnis (z. B. ein imported_*-Ordner ohne Dateien) würde ExoPlayer
-        // mit "EISDIR (Is a directory)" abbrechen lassen; die Wiedergabe wirkt dann tot.
-        if (mediaItems.isEmpty() && PlayableMedia.isPlayableFile(audiobook.filePath)) {
+        // Letzter Fallback: direkter Buchpfad – aber nur, wenn es eine echte Datei ist
+        if (mediaItems.isEmpty() && isPlayable(audiobook.filePath)) {
             mediaItems.add(
                 MediaItem.Builder()
-                    .setUri(Uri.fromFile(File(audiobook.filePath)))
+                    .setUri(toMediaUri(audiobook.filePath))
                     .setMediaMetadata(mediaMetadata)
                     .build()
             )
@@ -409,6 +708,8 @@ class PlaybackController(
                 play()
             }
         } else {
+            player.stop()
+            player.clearMediaItems()
             // Keine abspielbare Datei gefunden (verschoben/gelöscht oder Pfad ist ein Ordner).
             _playbackError.tryEmit(
                 "Keine abspielbaren Audiodateien für „${audiobook.title}“ gefunden. " +
@@ -770,6 +1071,105 @@ class PlaybackController(
         }
     }
 
+    fun getMediaSession(): MediaLibrarySession? = mediaSession
+
+    private suspend fun handleMediaItemPlayback(mediaId: String, requestedPosMs: Long) {
+        when {
+            mediaId.startsWith(PREFIX_BOOK) -> {
+                val bookId = mediaId.removePrefix(PREFIX_BOOK).toLongOrNull() ?: return
+                val book = repository.getAudiobookById(bookId) ?: return
+                val chapters = repository.getChaptersForAudiobook(bookId).firstOrNull() ?: emptyList()
+                loadAudiobook(book, chapters, autoPlay = true)
+                if (requestedPosMs > 0L && requestedPosMs != androidx.media3.common.C.TIME_UNSET) {
+                    seekTo(requestedPosMs)
+                }
+            }
+            mediaId.startsWith(PREFIX_CHAPTER) -> {
+                val parts = mediaId.removePrefix(PREFIX_CHAPTER).split("_")
+                val bookId = parts.getOrNull(0)?.toLongOrNull() ?: return
+                val chapterId = parts.getOrNull(1)?.toLongOrNull() ?: return
+                val book = repository.getAudiobookById(bookId) ?: return
+                val chapters = repository.getChaptersForAudiobook(bookId).firstOrNull() ?: emptyList()
+                val chapter = chapters.firstOrNull { it.id == chapterId }
+                loadAudiobook(book, chapters, autoPlay = true)
+                if (chapter != null) {
+                    seekTo(chapter.startTime)
+                }
+            }
+            mediaId == MEDIA_CAT_RECENT -> {
+                loadLastPlayedAudiobook(autoPlay = true)
+            }
+        }
+    }
+
+    private fun buildCategoryItem(id: String, title: String, subtitle: String): MediaItem {
+        val metadata = MediaMetadata.Builder()
+            .setTitle(title)
+            .setDisplayTitle(title)
+            .setSubtitle(subtitle)
+            .setIsBrowsable(true)
+            .setIsPlayable(false)
+            .setFolderType(MediaMetadata.FOLDER_TYPE_MIXED)
+            .build()
+        return MediaItem.Builder()
+            .setMediaId(id)
+            .setMediaMetadata(metadata)
+            .build()
+    }
+
+    private fun buildAudiobookMediaItem(audiobook: Audiobook): MediaItem {
+        val coverBytes = de.f_soft_studio.abookplayer.util.CoverHelper.loadCoverBytes(audiobook.coverUri, audiobook.filePath)
+        val coverFile = audiobook.coverUri?.let {
+            val trimmed = it.trim()
+            if (trimmed.startsWith("file://")) File(trimmed.removePrefix("file://")) else File(trimmed)
+        }
+        val artworkUri = when {
+            audiobook.coverUri?.startsWith("content://") == true -> Uri.parse(audiobook.coverUri)
+            coverFile != null && coverFile.exists() -> Uri.fromFile(coverFile)
+            else -> null
+        }
+        val texts = AudiobookMetadataText.derive(bookTitle = audiobook.title, author = audiobook.author, chapterTitle = null)
+        val metadata = MediaMetadata.Builder()
+            .setTitle(texts.title)
+            .setDisplayTitle(texts.title)
+            .setArtist(texts.artist ?: audiobook.author)
+            .setAlbumArtist(texts.artist ?: audiobook.author)
+            .setAlbumTitle(audiobook.title.ifBlank { texts.title })
+            .setSubtitle(texts.subtitle ?: audiobook.author)
+            .setIsBrowsable(true)
+            .setIsPlayable(true)
+            .setMediaType(MediaMetadata.MEDIA_TYPE_AUDIO_BOOK)
+            .setFolderType(MediaMetadata.FOLDER_TYPE_ALBUMS)
+
+        if (coverBytes != null) {
+            metadata.setArtworkData(coverBytes, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+        }
+        if (artworkUri != null) {
+            metadata.setArtworkUri(artworkUri)
+        }
+        return MediaItem.Builder()
+            .setMediaId(PREFIX_BOOK + audiobook.id)
+            .setMediaMetadata(metadata.build())
+            .build()
+    }
+
+    private fun buildChapterMediaItem(audiobook: Audiobook, chapter: Chapter): MediaItem {
+        val metadata = MediaMetadata.Builder()
+            .setTitle(chapter.title)
+            .setDisplayTitle(chapter.title)
+            .setArtist(audiobook.author.ifBlank { audiobook.title })
+            .setAlbumTitle(audiobook.title)
+            .setIsBrowsable(false)
+            .setIsPlayable(true)
+            .setMediaType(MediaMetadata.MEDIA_TYPE_AUDIO_BOOK_CHAPTER)
+            .setFolderType(MediaMetadata.FOLDER_TYPE_NONE)
+            .build()
+        return MediaItem.Builder()
+            .setMediaId("${PREFIX_CHAPTER}${audiobook.id}_${chapter.id}")
+            .setMediaMetadata(metadata)
+            .build()
+    }
+
     /**
      * Gibt Ressourcen des ExoPlayers, des LoudnessEnhancers und der MediaSession frei.
      */
@@ -794,6 +1194,13 @@ class PlaybackController(
     }
 
     companion object {
+        const val MEDIA_ROOT_ID = "root"
+        const val MEDIA_CAT_RECENT = "cat_recent"
+        const val MEDIA_CAT_ALL = "cat_all"
+        const val MEDIA_CAT_FAVORITES = "cat_favorites"
+        const val PREFIX_BOOK = "book_"
+        const val PREFIX_CHAPTER = "chapter_"
+
         @Volatile
         var instance: PlaybackController? = null
         var activeMediaSession: MediaSession? = null
@@ -816,7 +1223,7 @@ class PlaybackController(
             val recordListeningTimeUseCase = de.f_soft_studio.abookplayer.domain.usecase.RecordListeningTimeUseCase(repository)
             val saveProgressUseCase = de.f_soft_studio.abookplayer.domain.usecase.SaveProgressUseCase(repository, recordListeningTimeUseCase)
 
-            return PlaybackController(appContext, saveProgressUseCase)
+            return PlaybackController(appContext, saveProgressUseCase, repository)
         }
     }
 }

@@ -2,6 +2,29 @@
 
 Alle wichtigen Änderungen am ABook Player Projekt werden in dieser Datei dokumentiert.
 
+## [2.0.0] — 2026-09-23 (Major Stable Release)
+
+### 🚀 Highlights & Neuerungen
+- **Online-Metadaten- & Cover-Suche (Audible DE & iTunes):**
+  - Automatisierte Suche über Audible und iTunes Store mit Live-Trefferauswahl und HD-Cover-Vorschau.
+  - Extraktion von Sprechern (`narrator`), Buchreihen (`series`), Bandnummern (`seriesOrder`), Klappentexten und hochauflösenden quadratischen Covers (bis 1000x1000).
+  - Neuer interaktiver Such- und Auswahldialog (`MetadataSearchDialog`) mit manueller Suchbegriff-Anpassung.
+- **Fehlerfreier Hörbuch-Wechsel im Player:**
+  - Sofortiges Stoppen und Freigeben der bisherigen Wiedergabe beim Wechseln zu einem anderen Hörbuch in der Bibliothek.
+  - Präzise Sicherung des bisherigen Hörfortschritts des alten Titels vor dem Umschalten.
+  - Dynamische on-the-fly Rekonstruktion von Kapitellisten bei Ordner-Hörbüchern ohne Datenbank-Lücken.
+- **Härtung der Room-Datenbank:**
+  - Schutz vor unabsichtlichem Kaskaden-Löschen (`CASCADE DELETE`) von Kapiteln durch gezielte `@Update`-Strategie bei bestehenden Büchern.
+  - Verbesserte Fehlerbehandlung und automatische Reparatur verwaister Einträge.
+- **Car Mode (Fahrmodus):**
+  - Dedizierte Benutzeroberfläche mit vergrößerten Touch-Zielen, Kontrastoptimierung und vereinfachter Gestensteuerung für maximale Fahrsicherheit.
+- **Bibliotheks-Wartung & Performance:**
+  - Erweiterte Bibliotheks-Wartungsdialoge (Aufräumen verwaister Dateien, Synchronisation).
+  - Vollständige R8-Codeoptimierung und Resource-Shrinking für kompakte Release-APKs und minimalen Speicherverbrauch.
+  - Kompatibel mit Android 15 & 16.
+
+---
+
 ## [1.1.0] — 2026-08-05 (Official Stable Release)
 
 ### 🚀 Highlights & Hauptfeatures

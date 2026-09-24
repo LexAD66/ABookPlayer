@@ -33,8 +33,7 @@ class AbookPlaybackService : MediaLibraryService() {
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
-        val activeSession = PlaybackController.activeMediaSession
-        return activeSession as? MediaLibrarySession
+        return PlaybackController.getInstance(this).getMediaSession()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

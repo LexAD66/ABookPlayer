@@ -44,6 +44,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import coil.compose.AsyncImage
 import de.f_soft_studio.abookplayer.ui.player.PlayerViewModel
 import de.f_soft_studio.abookplayer.ui.theme.DarkStageColorScheme
@@ -201,6 +203,7 @@ fun CarModeScreen(
                             .size(80.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clearAndSetSemantics { contentDescription = "10 Sekunden zurückspulen" }
                     ) {
                         Text(
                             text = "-10s",
@@ -233,6 +236,7 @@ fun CarModeScreen(
                             .size(80.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clearAndSetSemantics { contentDescription = "10 Sekunden vorspulen" }
                     ) {
                         Text(
                             text = "+10s",

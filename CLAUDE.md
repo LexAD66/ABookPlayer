@@ -15,12 +15,16 @@ Native Android-App für lokale Hörbücher im `.abook`-Format.
 ## Architektur
 
 Pragmatische Clean Architecture + MVVM. Kotlin, Jetpack Compose, Media3/ExoPlayer,
-Room, Hilt, Coroutines/StateFlow.
+Room (v11), Manuelle Dependency Injection (Singletons / Factory-Methoden), Coroutines/StateFlow.
 
-- `ui/` – Compose Screens, Dialoge, ViewModels, Navigation, Theme
-- `domain/` – Modelle & UseCases ohne Android-Abhängigkeiten
+Details siehe:
+- 📐 [**ARCHITECTURE.md**](ARCHITECTURE.md)
+- 🤖 [**docs/AI_DEVELOPMENT_GUIDE.md**](docs/AI_DEVELOPMENT_GUIDE.md)
+
+- `ui/` – Compose Screens, Dialoge, ViewModels, Navigation, Theme (Paper & OLED True Black)
+- `domain/` – Reine Modelle & UseCases ohne Android-Abhängigkeiten
 - `data/` – Room-Entities, DAOs, Datenbank, Repository
-- `storage/` – `.abook`, SAF, Ordner-Scanner, Cover/Metadaten, `sync/` (WebDAV)
+- `storage/` – `.abook`, SAF, Ordner-Scanner, Cover/Metadaten-Scraper (Audible/iTunes)
 - `player/` – Media3, MediaSession, Sleep Timer, Loudness, Playback-Service
 - `widget/` – Homescreen-Widgets
 
@@ -42,7 +46,7 @@ Aus `ABookPlayer/` heraus:
 ./gradlew.bat test              # immer
 ./gradlew.bat assembleDebug     # bei UI-/Ressourcen-/Manifest-/Build-Änderungen
 ./gradlew.bat assembleRelease   # zusätzlich vor Release-nahen Änderungen
-./gradlew.bat installDebug      # danach aufs verbundene Gerät (Option B); wenn kein Gerät: klar melden
+./gradlew.bat installDebug      # PFLICHT nach jeder Änderung: direkt aufs verbundene Smartphone installieren und starten; wenn kein Gerät: klar melden
 ```
 
 Zusätzlich: neue Logik braucht Unit-Test (ViewModel / UseCase / Controller),

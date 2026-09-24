@@ -63,4 +63,22 @@ class FolderScannerTest {
         assertEquals("Kapitel_01", result.chapters[0].title)
         assertEquals("Kapitel_02", result.chapters[1].title)
     }
+
+    @Test
+    fun `scanDirectory scans multiple books in library folder without collapsing into one`() {
+        val libDir = tempFolder.newFolder("ABook")
+
+        val book1Dir = File(libDir, "Book 1").apply { mkdirs() }
+        File(book1Dir, "01.mp3").writeText("audio 1")
+
+        val book2Dir = File(libDir, "Book 2").apply { mkdirs() }
+        File(book2Dir, "01.mp3").writeText("audio 2")
+
+        val results = folderScanner.scanDirectory(libDir)
+
+        assertEquals(2, results.size)
+        val titles = results.map { it.audiobook.title }.toSet()
+        assertTrue(titles.contains("Book 1"))
+        assertTrue(titles.contains("Book 2"))
+    }
 }

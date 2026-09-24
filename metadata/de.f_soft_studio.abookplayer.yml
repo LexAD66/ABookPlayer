@@ -1,0 +1,42 @@
+Categories:
+  - Multimedia
+  - Audio
+License: MIT
+AuthorName: f-soft-studio
+SourceCode: https://github.com/f-soft-studio/ABookPlayer
+IssueTracker: https://github.com/f-soft-studio/ABookPlayer/issues
+
+AutoName: ABook Player
+Summary: Open-source audiobook player for .abook containers and audio folders
+Description: |-
+  ABook Player is a native, privacy-first, and open-source audiobook player for Android.
+  It supports .abook container packages and folder-based audiobook collections.
+
+  Features:
+  * Material 3 interface with Paper-Look library and OLED True Black player
+  * AndroidX Media3 ExoPlayer background playback and Android Auto support
+  * Smart multi-disc (CD1/CD2) folder merging
+  * Audible & iTunes online metadata and HD cover art search
+  * Sleep timer with shake-to-extend gesture (+15 minutes)
+  * 100% offline local listening statistics
+  * Car Mode with enlarged controls
+  * Plays FLAC, MP3, M4A, AAC, and OGG
+  * Zero trackers, zero ads, zero proprietary analytics
+
+RepoType: git
+Repo: https://github.com/f-soft-studio/ABookPlayer.git
+
+Builds:
+  - versionName: 2.0.0
+    versionCode: 302
+    commit: v2.0.0
+    subdir: ABookPlayer
+    gradle:
+      - yes
+    output: app/build/outputs/apk/release/app-release-unsigned.apk
+    prebuild: sed -i -e 's/isMinifyEnabled = true/isMinifyEnabled = false/' app/build.gradle.kts || true
+
+AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags
+CurrentVersion: 2.0.0
+CurrentVersionCode: 302

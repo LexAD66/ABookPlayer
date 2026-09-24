@@ -108,19 +108,9 @@ class FolderScanner(
             }
         } else if (directAudioFiles.isNotEmpty()) {
             allAudioFiles.addAll(directAudioFiles)
-            for (subDir in otherSubfolders) {
-                val subAudioFiles = (subDir.listFiles() ?: emptyArray())
-                    .filter { isAudioFile(it) }
-                    .sortedWith(Comparator { f1, f2 -> naturalCompare(f1.name, f2.name) })
-                allAudioFiles.addAll(subAudioFiles)
-            }
-        } else if (otherSubfolders.isNotEmpty()) {
-            for (subDir in otherSubfolders) {
-                val subAudioFiles = (subDir.listFiles() ?: emptyArray())
-                    .filter { isAudioFile(it) }
-                    .sortedWith(Comparator { f1, f2 -> naturalCompare(f1.name, f2.name) })
-                allAudioFiles.addAll(subAudioFiles)
-            }
+        } else {
+            // Keine direkten Audiodateien und keine Disc-Unterordner -> Container-, Serien- oder Bibliotheks-Ordner
+            return null
         }
 
         if (allAudioFiles.isEmpty()) return null
@@ -192,7 +182,7 @@ class FolderScanner(
             }
             val coverCandidate = imageFiles.firstOrNull { f ->
                 val name = f.nameWithoutExtension.lowercase()
-                name.startsWith("cover") || name.startsWith("folder") || name.startsWith("front") || name.startsWith("album") || name.startsWith("art")
+                name.startsWith("cover") || name.startsWith("folder") || name.startsWith("front") || name.startsWith("album") || name.startsWith("art") || name.contains("cover")
             } ?: imageFiles.firstOrNull()
             coverUri = coverCandidate?.absolutePath
         }

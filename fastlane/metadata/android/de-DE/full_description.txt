@@ -1,0 +1,15 @@
+ABook Player ist ein nativer, quelloffener und werbefreier Android-Hörbuch-Player, entwickelt für höchste Ansprüche an Datenschutz, Audioqualität und Bedienkomfort.
+
+Die App unterstützt sowohl das moderne .abook-Containerformat als auch herkömmliche Hörbuch-Ordner (inkl. automatischer Zusammenführung von CD1/CD2-Unterordnern).
+
+Haupteigenschaften:
+• Modernes Material 3 Design: Wunderschöner warmer Paper-Look für die Bibliothek und stromsparendes OLED True Black (#000000) für den Player.
+• Audio-Engine auf Basis von AndroidX Media3: Perfekt nahtlose Hintergrundwiedergabe, Automotive-Integration (Android Auto) und Notification-Steuerung.
+• Intelligente Ordner- und Kapitelverwaltung: Automatisches Erkennen und Zusammenführen von Unterordnern und Discs zu einem Gesamthörbuch.
+• Automatische Metadaten- & Cover-Suche: Suche über Audible (DE) und iTunes inklusive Trefferauswahl und HD-Cover-Vorschau.
+• Fortschrittssynchronisation & Sicherung: Automatisches Merken der exakten Wiedergabeposition pro Hörbuch und Schutz vor Datenverlust.
+• Erweiterter Sleep Timer & Shake-to-Extend: Abschalttimer nach Zeit oder am Kapitelende; Schütteln des Smartphones verlängert die Wiedergabe um 15 Minuten.
+• Lokales Statistik-Dashboard: Detaillierte tägliche und wöchentliche Hörstatistiken und Streaks – 100% lokal und ohne Tracker.
+• Car Mode & Homescreen-Widgets: Optimierte Großtasten-Ansicht für das Auto und praktische Schnellstart-Widgets.
+• Breiter Format-Support: Spielt FLAC, MP3, M4A, AAC und OGG ab.
+• 100% Open Source: Frei von Werbung, Trackern, Analytics oder Cloud-Zwängen.

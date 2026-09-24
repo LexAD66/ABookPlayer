@@ -25,13 +25,26 @@ Dieses Repository enthaelt eine native Android-App fuer lokale Hoerbuecher im `.
 - `player/`: Media3/ExoPlayer, MediaSession, Sleep Timer, Loudness und Playback-Service.
 - `widget/`: Android Homescreen-Widgets.
 
-## Tests und Verifikation
+## Tests und Verifikation & Automatisches Phone-Deployment
 
 - Fuer Logikaenderungen passende Unit-Tests ergaenzen oder anpassen.
 - Standardpruefung ist `.\gradlew.bat test`.
 - Bei UI-/Ressourcen-/Manifest-/Buildaenderungen zusaetzlich `.\gradlew.bat assembleDebug`.
 - Vor Release-nahen Aenderungen `.\gradlew.bat assembleDebug assembleRelease`.
-- Nach erfolgreicher App-Aenderung und Verifikation gilt die vorhandene Option-B-Regel: `.\gradlew.bat installDebug` versuchen. Falls kein Geraet verbunden ist, Ergebnis klar melden.
+- **Automatische Phone-Aktualisierung (Pflichtregel)**: Nach JEDER erfolgreichen Code- oder App-Änderung und Verifikation MUSS die App automatisch per `.\gradlew.bat installDebug` auf dem angeschlossenen Smartphone aktualisiert und gestartet werden (`adb shell am start -n de.f_soft_studio.abookplayer/.MainActivity`). Falls kein Gerät verbunden ist, wird dies im Statusbericht gemeldet.
+
+## Wichtige Referenzdokumente für KI & Agenten
+
+- **Architektur-Spezifikation:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
+- **Leitfaden für KI-Entwickler & Fallstricke:** [`docs/AI_DEVELOPMENT_GUIDE.md`](docs/AI_DEVELOPMENT_GUIDE.md)
+- **F-Droid Build-Rezept:** [`metadata/de.f_soft_studio.abookplayer.yml`](metadata/de.f_soft_studio.abookplayer.yml)
+- **Fastlane-Metadaten:** [`fastlane/metadata/android/`](fastlane/metadata/android/)
+
+## Kritische Architektur-Regeln (Gotchas)
+
+- **Room SQLite CASCADE DELETE Falle**: Niemals `@Insert(REPLACE)` auf `AudiobookEntity` ausführen, wenn ein Hörbuch bereits existiert (`id > 0`). Immer `@Update` (`updateAudiobook`) verwenden, da SQLite sonst kaskadierend alle Kapitel (`chapters`) löscht!
+- **Media3 Verzeichnis-Falle**: Bei Ordner-Hörbüchern zeigt `Audiobook.filePath` auf einen Ordner. ExoPlayer benötigt Datei-URIs aus den Kapiteln. Fehlen Kapitel, on-the-fly via `FolderScanner` rekonstruieren.
+- **FOSS & F-Droid Compliance**: Ausschließlich freie Open-Source-Bibliotheken (Apache 2.0 / MIT) verwenden. Keine GMS-, Firebase- oder Tracking-Abhängigkeiten einführen.
 
 ## Subagenten
 

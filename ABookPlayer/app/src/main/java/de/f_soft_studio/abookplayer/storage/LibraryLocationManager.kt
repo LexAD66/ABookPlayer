@@ -66,6 +66,29 @@ object LibraryLocationManager {
     }
 
     /**
+     * Liefert alle Standard-Suchverzeichnisse auf dem Gerät (z. B. /ABook, /Audiobooks, /Download/ABook, etc.).
+     */
+    fun getDefaultScanDirectories(context: Context): List<File> {
+        val list = mutableListOf<File>()
+        list.add(getLibraryDir(context))
+
+        val candidates = listOf(
+            File(Environment.getExternalStorageDirectory(), "ABook"),
+            File(Environment.getExternalStorageDirectory(), "Audiobooks"),
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "ABook"),
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "ABookPlayer"),
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "Audiobooks"),
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "ABook")
+        )
+        for (cand in candidates) {
+            if (cand.exists() && cand.isDirectory && list.none { it.absolutePath == cand.absolutePath }) {
+                list.add(cand)
+            }
+        }
+        return list
+    }
+
+    /**
      * Speichert einen neuen Bibliotheks-Pfad.
      */
     fun setLibraryDir(context: Context, dir: File, uri: Uri? = null) {

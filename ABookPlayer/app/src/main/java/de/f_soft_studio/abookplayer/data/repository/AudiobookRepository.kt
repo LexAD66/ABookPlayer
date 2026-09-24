@@ -50,11 +50,30 @@ class AudiobookRepository(
     }
 
     /**
+     * Sucht nach Hörbüchern anhand von Titel oder Autor.
+     */
+    suspend fun searchAudiobooks(query: String): List<Audiobook> {
+        return audiobookDao.searchAudiobooks(query).map { it.toDomainModel() }
+    }
+
+    /**
      * Fügt ein neues Hörbuch ein oder aktualisiert ein bestehendes.
+     *
+     * WICHTIG ZUR DATENINTEGRITÄT:
+     * Wenn `audiobook.id > 0` ist, MUSS zwingend [AudiobookDao.updateAudiobook] verwendet
+     * werden, da ein Aufruf von `insertAudiobook` mit `OnConflictStrategy.REPLACE`
+     * intern ein SQLite-Delete der Zeile bewirkt, was die Fremdschlüssel-Kaskade
+     * (`onDelete = CASCADE`) auf der Tabelle `chapters` auslöst und alle Kapitel löschen würde!
      */
     suspend fun saveAudiobook(audiobook: Audiobook): Long {
-        return audiobookDao.insertAudiobook(audiobook.toEntity())
+        return if (audiobook.id > 0L && audiobookDao.getAudiobookById(audiobook.id) != null) {
+            audiobookDao.updateAudiobook(audiobook.toEntity())
+            audiobook.id
+        } else {
+            audiobookDao.insertAudiobook(audiobook.toEntity())
+        }
     }
+
 
     /**
      * Aktualisiert den Wiedergabefortschritt eines Hörbuchs.
@@ -187,6 +206,21 @@ class AudiobookRepository(
             chapterDao.deleteChaptersForAudiobook(id)
         }
 
+        // Leere imported_* Verzeichnisse auf dem Speicher bereinigen
+        if (context != null) {
+            try {
+                val libDir = de.f_soft_studio.abookplayer.storage.LibraryLocationManager.getLibraryDir(context)
+                libDir.listFiles()?.forEach { f ->
+                    if (f.isDirectory && f.name.startsWith("imported_")) {
+                        val hasAudio = f.walkTopDown().any { it.isFile && de.f_soft_studio.abookplayer.storage.FolderScanner.isAudioFile(it) }
+                        if (!hasAudio) {
+                            f.deleteRecursively()
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
         val zeroDurationFixed = recalculateZeroDurationBooks(context)
 
         return LibraryCleanupResult(
@@ -267,8 +301,14 @@ data class LibraryCleanupResult(
      * Speichert Kapitel für ein Hörbuch.
      */
     suspend fun saveChapters(chapters: List<Chapter>) {
-        chapterDao.insertChapters(chapters.map { it.toEntity() })
+        if (chapters.isEmpty()) return
+        val bookId = chapters.first().audiobookId
+        if (bookId > 0L) {
+            chapterDao.deleteChaptersForAudiobook(bookId)
+        }
+        chapterDao.insertChapters(chapters.map { it.toEntity().copy(id = 0L) })
     }
+
 
     /**
      * Liefert alle Lesezeichen für ein Hörbuch.

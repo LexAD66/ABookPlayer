@@ -1,0 +1,15 @@
+ABook Player is a native, privacy-focused, and open-source audiobook player designed for Android, tailored for high-quality audio, elegance, and reliability.
+
+It supports both modern .abook container archives and standard audiobook folder structures (including automatic merging of multi-disc CD1/CD2 directories).
+
+Key Features:
+• Modern Material 3 UI: Warm paper-style design for the library and true OLED black (#000000) for the player screen to maximize battery savings.
+• Media3 Audio Engine: Smooth background playback, Android Auto integration, and rich system lockscreen/notification controls.
+• Smart Folder & Disc Merging: Automatically scans multi-disc setups into single continuous audiobooks.
+• Metadata & Cover Art Fetcher: Search Audible and iTunes with multiple candidate matching and high-definition cover previews.
+• Reliable Progress & Chapter Sync: Automatic position saving, anti-loss protection, and dynamic chapter recovery.
+• Sleep Timer & Shake to Extend: Sleep timer with chapter-end support; shaking the device automatically extends playback by 15 minutes.
+• Local Listening Statistics: Daily and weekly listening streaks and time graphs — 100% offline and tracker-free.
+• Car Mode & Widgets: High-visibility large button interface for driving and homescreen playback widgets.
+• Broad Format Compatibility: Plays FLAC, MP3, M4A, AAC, and OGG.
+• 100% Free & Open Source: No advertisements, no telemetry, no proprietary analytics.

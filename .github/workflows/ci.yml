@@ -1,0 +1,43 @@
+name: CI Build & Test
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-and-test:
+    name: Build & Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x ABookPlayer/gradlew
+
+      - name: Run Unit Tests
+        run: |
+          cd ABookPlayer
+          ./gradlew test --stacktrace
+
+      - name: Assemble Debug APK
+        run: |
+          cd ABookPlayer
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ABookPlayer/app/build/reports/tests/

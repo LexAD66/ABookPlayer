@@ -106,8 +106,15 @@ class AbookStorage(
     }
 
     suspend fun scanAndImport(additionalFolderPaths: List<String> = emptyList()): List<Audiobook> = withContext(Dispatchers.IO) {
-        val primaryLibDir = LibraryLocationManager.getLibraryDir(context)
-        val directoriesToScan = mutableListOf<File>(primaryLibDir)
+        // Vor dem Scan die Datenbank bereinigen (verwaiste 0-Byte-Pfade und leere Ordner entfernen)
+        try {
+            repository.cleanupDuplicatesAndOrphans(context)
+        } catch (e: Exception) {
+            Log.d("AbookStorage", "cleanupDuplicatesAndOrphans vor Scan: ${e.message}")
+        }
+
+        val directoriesToScan = mutableListOf<File>()
+        directoriesToScan.addAll(LibraryLocationManager.getDefaultScanDirectories(context))
 
         val allAdditional = (additionalFolderPaths + getScannedFolderUris()).distinct()
         for (path in allAdditional) {
@@ -128,11 +135,11 @@ class AbookStorage(
         val filesToScan = mutableListOf<File>()
         for (dir in directoriesToScan) {
             if (dir.exists() && dir.isDirectory) {
-                dir.listFiles { f -> f.isFile && (f.extension.equals("abook", true) || f.extension.equals("zip", true)) }
-                    ?.let { filesToScan.addAll(it) }
+                dir.walkTopDown().maxDepth(5)
+                    .filter { f -> f.isFile && (f.extension.equals("abook", true) || f.extension.equals("zip", true)) }
+                    .forEach { filesToScan.add(it) }
             }
         }
-
 
         val imported = mutableListOf<Audiobook>()
         val existingBooks = try { repository.getAllAudiobooks().first() } catch (_: Exception) { emptyList() }
@@ -175,6 +182,7 @@ class AbookStorage(
             for (eb in allCurrent) {
                 if (eb.filePath == book.filePath) {
                     isIdenticalDuplicate = true
+                    matchBook = eb
                     break
                 }
                 val comp = DuplicateDetector.compare(
@@ -197,21 +205,43 @@ class AbookStorage(
             }
 
             if (isIdenticalDuplicate) {
+                var handledOrphan = false
                 matchBook?.let { existing ->
-                    if (existing.filePath != book.filePath) {
-                        val match = DuplicateMatch(
-                            existingAudiobook = existing,
-                            candidateTitle = book.title,
-                            candidatePath = book.filePath,
-                            comparisonType = ComparisonType.IDENTICAL_DUPLICATE,
-                            durationDifferenceMs = abs(book.duration - existing.duration)
-                        )
-                        if (lastDetectedDuplicates.none { it.candidatePath == book.filePath }) {
-                            lastDetectedDuplicates.add(match)
+                    val existingFile = if (existing.filePath.startsWith("content://")) null else File(existing.filePath)
+                    val existingValid = existingFile != null && existingFile.exists() && (existingFile.isFile || (existingFile.isDirectory && existingFile.walkTopDown().maxDepth(4).any { FolderScanner.isAudioFile(it) }))
+                    if (!existingValid) {
+                        // Vorhandener Eintrag ist ein toter/verwaister Pfad -> mit dem echten Hörbuch aktualisieren!
+                        Log.d("AbookStorage", "Ersetze verwaistes Buch (${existing.id}) durch gültigen Pfad: ${book.filePath}")
+                        val updated = book.copy(id = existing.id)
+                        repository.saveAudiobook(updated)
+                        val updatedChapters = chapters.map { it.copy(audiobookId = existing.id) }
+                        repository.saveChapters(updatedChapters)
+                        importedList.add(updated)
+                    } else {
+                        val existingChapters = repository.getChaptersForAudiobook(existing.id).first()
+                        if (existingChapters.isEmpty() && chapters.isNotEmpty()) {
+                            val updatedChapters = chapters.map { it.copy(audiobookId = existing.id) }
+                            repository.saveChapters(updatedChapters)
+                            Log.d("AbookStorage", "Kapitel für bestehendes Buch nachgetragen: ${existing.title} (${chapters.size} Kapitel)")
+                        }
+                        if (existing.filePath != book.filePath) {
+                            val match = DuplicateMatch(
+                                existingAudiobook = existing,
+                                candidateTitle = book.title,
+                                candidatePath = book.filePath,
+                                comparisonType = ComparisonType.IDENTICAL_DUPLICATE,
+                                durationDifferenceMs = abs(book.duration - existing.duration)
+                            )
+                            if (lastDetectedDuplicates.none { it.candidatePath == book.filePath }) {
+                                lastDetectedDuplicates.add(match)
+                            }
                         }
                     }
                 }
-                Log.d("AbookStorage", "Identisches Duplikat übersprungen: ${book.title} (${book.filePath})")
+                if (!handledOrphan) {
+                    Log.d("AbookStorage", "Identisches Duplikat übersprungen: ${book.title} (${book.filePath})")
+
+                }
             } else {
                 if (isDifferentVersion) {
                     val versionLabel = if (!book.narrator.isNullOrBlank()) " (${book.narrator})" else " (Edition)"
@@ -223,23 +253,49 @@ class AbookStorage(
 
                 var finalCoverUri = book.coverUri
                 var finalDescription = book.description
+                var finalNarrator = book.narrator
+                var finalSeries = book.series
+                var finalSeriesOrder = book.seriesOrder
                 if (finalCoverUri.isNullOrBlank()) {
                     val isAutoFetch = context.getSharedPreferences("abook_settings_prefs", Context.MODE_PRIVATE).getBoolean("auto_online_cover_fetch", true)
                     if (isAutoFetch) {
                         try {
                             val scraper = OnlineCoverScraper(context)
                             val onlineCover = scraper.searchCoverAndMetadata(book.title, book.author)
-                            if (onlineCover != null && !onlineCover.coverPath.isNullOrBlank()) {
-                                repository.updateCoverAndDescription(bookId, onlineCover.coverPath, onlineCover.description)
-                                finalCoverUri = onlineCover.coverPath
-                                finalDescription = onlineCover.description
+                            if (onlineCover != null) {
+                                if (!onlineCover.coverPath.isNullOrBlank()) {
+                                    repository.updateCoverAndDescription(bookId, onlineCover.coverPath, onlineCover.description)
+                                    finalCoverUri = onlineCover.coverPath
+                                    finalDescription = onlineCover.description ?: finalDescription
+                                }
+                                if (finalNarrator.isNullOrBlank() && !onlineCover.narrator.isNullOrBlank()) {
+                                    finalNarrator = onlineCover.narrator
+                                }
+                                if (finalSeries.isNullOrBlank() && !onlineCover.series.isNullOrBlank()) {
+                                    finalSeries = onlineCover.series
+                                    if (finalSeriesOrder == null && onlineCover.seriesOrder != null) {
+                                        finalSeriesOrder = onlineCover.seriesOrder
+                                    }
+                                }
+                                if (finalNarrator != book.narrator || finalSeries != book.series || finalSeriesOrder != book.seriesOrder) {
+                                    repository.saveAudiobook(
+                                        book.copy(
+                                            id = bookId,
+                                            coverUri = finalCoverUri,
+                                            description = finalDescription,
+                                            narrator = finalNarrator,
+                                            series = finalSeries,
+                                            seriesOrder = finalSeriesOrder
+                                        )
+                                    )
+                                }
                             }
                         } catch (e: Exception) {
                             Log.d("AbookStorage", "Auto online cover fetch failed: ${e.message}")
                         }
                     }
                 }
-                importedList.add(book.copy(id = bookId, coverUri = finalCoverUri, description = finalDescription))
+                importedList.add(book.copy(id = bookId, coverUri = finalCoverUri, description = finalDescription, narrator = finalNarrator, series = finalSeries, seriesOrder = finalSeriesOrder))
             }
         }
     }
@@ -294,6 +350,50 @@ class AbookStorage(
     }
 
     /**
+     * Versucht, eine SAF-Tree-Uri direkt in einen echten Verzeichnispfad aufzulösen.
+     */
+    fun resolveTreeUriToDirectory(treeUri: Uri): File? {
+        try {
+            val docId = try {
+                android.provider.DocumentsContract.getTreeDocumentId(treeUri)
+            } catch (_: Exception) {
+                treeUri.lastPathSegment ?: ""
+            }
+            val decodedDocId = Uri.decode(docId)
+            val parts = decodedDocId.split(":")
+            if (parts.size >= 2) {
+                val volume = parts[0]
+                val relPath = parts.drop(1).joinToString(":")
+                if (volume.equals("primary", ignoreCase = true) || volume.contains("primary")) {
+                    val base = Environment.getExternalStorageDirectory()
+                    val target = if (relPath.isBlank()) base else File(base, relPath)
+                    if (target.exists() && target.isDirectory) {
+                        return target
+                    }
+                } else {
+                    val extDirs = context.getExternalFilesDirs(null)
+                    for (dir in extDirs) {
+                        if (dir != null) {
+                            val path = dir.absolutePath
+                            val idx = path.indexOf("/Android/data")
+                            if (idx != -1) {
+                                val root = File(path.substring(0, idx))
+                                val target = if (relPath.isBlank()) root else File(root, relPath)
+                                if (target.exists() && target.isDirectory) {
+                                    return target
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.d("AbookStorage", "resolveTreeUriToDirectory failed: ${e.message}")
+        }
+        return null
+    }
+
+    /**
      * Importiert einen ganzen Ordner per SAF-TreeUri (DocumentFile).
      */
     suspend fun importFromFolderUri(treeUri: Uri): Int = withContext(Dispatchers.IO) {
@@ -303,6 +403,28 @@ class AbookStorage(
                 context.contentResolver.takePersistableUriPermission(treeUri, takeFlags)
             } catch (_: Exception) {}
 
+            try {
+                repository.cleanupDuplicatesAndOrphans(context)
+            } catch (_: Exception) {}
+
+            val resolvedDir = resolveTreeUriToDirectory(treeUri)
+            if (resolvedDir != null && resolvedDir.exists() && resolvedDir.isDirectory) {
+                saveScannedFolderUri(resolvedDir.absolutePath)
+                val existingBooks = try { repository.getAllAudiobooks().first() } catch (_: Exception) { emptyList() }
+                val imported = mutableListOf<Audiobook>()
+                scanUnpackedFolderInternal(resolvedDir, existingBooks, imported)
+                resolvedDir.walkTopDown().maxDepth(5)
+                    .filter { f -> f.isFile && (f.extension.equals("abook", true) || f.extension.equals("zip", true)) }
+                    .forEach { zipFile ->
+                        if (existingBooks.none { it.filePath == zipFile.absolutePath }) {
+                            val book = parseAndSaveAbook(zipFile)
+                            if (book != null) imported.add(book)
+                        }
+                    }
+                return@withContext imported.size
+            }
+
+            saveScannedFolderUri(treeUri.toString())
             val docFile = DocumentFile.fromTreeUri(context, treeUri) ?: return@withContext 0
             val existingBooks = try { repository.getAllAudiobooks().first() } catch (_: Exception) { emptyList() }
             val imported = mutableListOf<Audiobook>()
@@ -344,6 +466,7 @@ class AbookStorage(
             for (eb in allCurrent) {
                 if (eb.filePath == dir.uri.toString()) {
                     isIdenticalDuplicate = true
+                    matchBook = eb
                     break
                 }
                 val comp = DuplicateDetector.compare(
@@ -365,110 +488,78 @@ class AbookStorage(
                 }
             }
 
-            if (isIdenticalDuplicate) {
-                matchBook?.let { existing ->
-                    if (existing.filePath != dir.uri.toString()) {
-                        val match = DuplicateMatch(
-                            existingAudiobook = existing,
-                            candidateTitle = bookTitle,
-                            candidatePath = dir.uri.toString(),
-                            comparisonType = ComparisonType.IDENTICAL_DUPLICATE,
-                            durationDifferenceMs = 0L,
-                            isSafUri = true
-                        )
-                        if (lastDetectedDuplicates.none { it.candidatePath == dir.uri.toString() }) {
-                            lastDetectedDuplicates.add(match)
-                        }
-                    }
-                }
-                Log.d("AbookStorage", "Identisches SAF-Duplikat übersprungen: $bookTitle")
-            } else {
-                val finalTitle = if (isDifferentVersion) "$bookTitle (Edition)" else bookTitle
-                val bookDir = File(getPublicStorageDir(context), "imported_${finalTitle.hashCode()}").apply { if (!exists()) mkdirs() }
-                val chapters = mutableListOf<Chapter>()
-                var totalDuration = 0L
-                val allDocAudioFiles = mutableListOf<Pair<String, DocumentFile>>()
-
-                if (discSubfolders.isNotEmpty()) {
-                    for (disc in discSubfolders.sortedBy { it.name }) {
-                        disc.listFiles().filter { it.isFile && isAudioFile(it.name ?: "") }
-                            .sortedBy { it.name }
-                            .forEach { f ->
-                                val chName = AudiobookMetadataText.stripAudioExtension(f.name ?: "Kapitel")
-                                allDocAudioFiles.add(Pair("${disc.name} - $chName", f))
-                            }
-                    }
-                } else {
-                    audioFiles.sortedBy { it.name }
+            val allDocAudioFiles = mutableListOf<Pair<String, DocumentFile>>()
+            if (discSubfolders.isNotEmpty()) {
+                for (disc in discSubfolders.sortedBy { it.name }) {
+                    disc.listFiles().filter { it.isFile && isAudioFile(it.name ?: "") }
+                        .sortedBy { it.name }
                         .forEach { f ->
-                            allDocAudioFiles.add(
-                                Pair(AudiobookMetadataText.stripAudioExtension(f.name ?: "Kapitel"), f)
-                            )
+                            val chName = AudiobookMetadataText.stripAudioExtension(f.name ?: "Kapitel")
+                            allDocAudioFiles.add(Pair("${disc.name} - $chName", f))
                         }
                 }
-
-                for ((chTitle, doc) in allDocAudioFiles) {
-                    val targetFile = File(bookDir, doc.name ?: "track.mp3")
-                    if (!targetFile.exists() || targetFile.length() == 0L) {
-                        context.contentResolver.openInputStream(doc.uri)?.use { input ->
-                            copyStreamSafely(input, targetFile)
-                        }
+            } else {
+                audioFiles.sortedBy { it.name }
+                    .forEach { f ->
+                        allDocAudioFiles.add(
+                            Pair(AudiobookMetadataText.stripAudioExtension(f.name ?: "Kapitel"), f)
+                        )
                     }
-                    val dur = ChapterDurations.readDurationMs(targetFile)
-                    chapters.add(Chapter(audiobookId = 0L, title = chTitle, startTime = totalDuration, audioPath = targetFile.absolutePath))
-                    totalDuration += dur
+            }
+
+            val chapters = mutableListOf<Chapter>()
+            var totalDuration = 0L
+            for ((chTitle, doc) in allDocAudioFiles) {
+                val dur = ChapterDurations.readDurationMs(context, doc.uri.toString())
+                chapters.add(Chapter(audiobookId = 0L, title = chTitle, startTime = totalDuration, audioPath = doc.uri.toString()))
+                totalDuration += dur
+            }
+
+            var coverUri: String? = null
+            val imageDocs = children.filter { f -> f.isFile && f.name?.lowercase()?.let { ext -> ext.endsWith(".jpg") || ext.endsWith(".png") || ext.endsWith(".jpeg") || ext.endsWith(".webp") } == true }
+            val coverCandidate = imageDocs.firstOrNull { f ->
+                val name = f.name?.lowercase() ?: ""
+                name.startsWith("cover") || name.startsWith("folder") || name.startsWith("front") || name.contains("cover")
+            } ?: imageDocs.firstOrNull()
+            if (coverCandidate != null) {
+                coverUri = coverCandidate.uri.toString()
+            }
+
+            if (isIdenticalDuplicate) {
+                var handledOrphan = false
+                matchBook?.let { existing ->
+                    val existingFile = if (existing.filePath.startsWith("content://")) null else File(existing.filePath)
+                    val existingValid = existingFile != null && existingFile.exists() && (existingFile.isFile || (existingFile.isDirectory && existingFile.walkTopDown().maxDepth(4).any { FolderScanner.isAudioFile(it) }))
+                    if (!existingValid) {
+                        Log.d("AbookStorage", "Ersetze verwaistes Buch (${existing.id}) durch gültige SAF-Uri: ${dir.uri}")
+                        val updated = existing.copy(
+                            title = bookTitle,
+                            filePath = dir.uri.toString(),
+                            coverUri = coverUri ?: existing.coverUri,
+                            duration = totalDuration
+                        )
+                        repository.saveAudiobook(updated)
+                        repository.saveChapters(chapters.map { it.copy(audiobookId = existing.id) })
+                        imported.add(updated)
+                        handledOrphan = true
+                    }
                 }
-
-                if (chapters.isNotEmpty()) {
-                    var coverUri: String? = null
-                    val imageDocs = children.filter { f -> f.isFile && f.name?.lowercase()?.let { ext -> ext.endsWith(".jpg") || ext.endsWith(".png") || ext.endsWith(".jpeg") || ext.endsWith(".webp") } == true }
-                    val coverCandidate = imageDocs.firstOrNull { f ->
-                        val name = f.name?.lowercase() ?: ""
-                        name.startsWith("cover") || name.startsWith("folder") || name.startsWith("front")
-                    } ?: imageDocs.firstOrNull()
-
-                    if (coverCandidate != null) {
-                        val targetCover = File(bookDir, coverCandidate.name ?: "cover.jpg")
-                        if (!targetCover.exists()) {
-                            context.contentResolver.openInputStream(coverCandidate.uri)?.use { input ->
-                                copyStreamSafely(input, targetCover)
-                            }
-                        }
-                        coverUri = targetCover.absolutePath
-                    }
-
-                    if (coverUri == null) {
-                        for (ch in chapters.take(10)) {
-                            try {
-                                val retriever = android.media.MediaMetadataRetriever()
-                                retriever.setDataSource(ch.audioPath)
-                                val art = retriever.embeddedPicture
-                                retriever.release()
-                                if (art != null && art.isNotEmpty()) {
-                                    val coversDir = LibraryLocationManager.getCoversDir(context)
-                                    val targetFile = File(coversDir, "cover_embedded_${bookDir.name.hashCode()}.jpg")
-
-                                    targetFile.writeBytes(art)
-                                    coverUri = targetFile.absolutePath
-                                    break
-                                }
-                            } catch (_: Exception) {}
-                        }
-                    }
-
-                    val book = Audiobook(
-                        title = finalTitle,
-                        author = "",
-                        filePath = bookDir.absolutePath,
-                        coverUri = coverUri,
-                        duration = totalDuration,
-                        lastPlayed = System.currentTimeMillis()
-                    )
-                    val bookId = repository.saveAudiobook(book)
-                    repository.saveChapters(chapters.map { it.copy(audiobookId = bookId) })
-                    imported.add(book.copy(id = bookId))
-                    return
+                if (!handledOrphan) {
+                    Log.d("AbookStorage", "Identisches SAF-Duplikat übersprungen: $bookTitle")
                 }
+            } else if (chapters.isNotEmpty()) {
+                val finalTitle = if (isDifferentVersion) "$bookTitle (Edition)" else bookTitle
+                val book = Audiobook(
+                    title = finalTitle,
+                    author = "",
+                    filePath = dir.uri.toString(),
+                    coverUri = coverUri,
+                    duration = totalDuration,
+                    lastPlayed = System.currentTimeMillis()
+                )
+                val bookId = repository.saveAudiobook(book)
+                repository.saveChapters(chapters.map { it.copy(audiobookId = bookId) })
+                imported.add(book.copy(id = bookId))
             }
         }
 
@@ -785,7 +876,7 @@ class AbookStorage(
     }
 
     private fun copyStreamSafely(input: InputStream, targetFile: File, maxSizeBytes: Long = MAX_SINGLE_FILE_SIZE_BYTES): Boolean {
-        val tempFile = File(targetFile.parentFile, "${targetFile.name}.tmp")
+        val tempFile = File.createTempFile("stream_", ".tmp", context.cacheDir)
         var bytesWritten = 0L
         try {
             FileOutputStream(tempFile).use { output ->
@@ -801,10 +892,17 @@ class AbookStorage(
                     output.write(buffer, 0, read)
                 }
             }
-            if (tempFile.exists()) {
-                if (targetFile.exists()) targetFile.delete()
-                return tempFile.renameTo(targetFile)
+            if (tempFile.exists() && tempFile.length() > 0L) {
+                targetFile.parentFile?.mkdirs()
+                tempFile.inputStream().use { inStream ->
+                    FileOutputStream(targetFile).use { outStream ->
+                        inStream.copyTo(outStream)
+                    }
+                }
+                tempFile.delete()
+                return targetFile.exists() && targetFile.length() > 0L
             }
+            tempFile.delete()
             return false
         } catch (e: Exception) {
             Log.e("AbookStorage", "Fehler bei atomarer Extraktion: ${e.message}", e)

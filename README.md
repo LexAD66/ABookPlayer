@@ -1,27 +1,52 @@
 # ABook Player Project
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/CHANGELOG.md)
-[![Status](https://img.shields.io/badge/status-Release%201.1.0%20Stable-brightgreen.svg)](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/PROJECT_HISTORY.md)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/CHANGELOG.md)
+[![Status](https://img.shields.io/badge/status-Release%202.0.0%20Stable-brightgreen.svg)](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/PROJECT_HISTORY.md)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen.svg)](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/build.gradle.kts)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/LICENSE)
+[![F-Droid Compatible](https://img.shields.io/badge/F--Droid-Ready-blue.svg)](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/metadata/de.f_soft_studio.abookplayer.yml)
 
 Willkommen beim **ABook Player** Projekt-Repository!
 
-Dieses Repository enthält die native Android-App zur Wiedergabe von Hörbüchern im **.abook**-Containerformat sowie die vollständige, konsolidierte Projektdokumentation.
+Dieses Repository enthält die native Android-App zur Wiedergabe von Hörbüchern im **.abook**-Containerformat sowie herkömmlicher Ordner-Sammlungen, zusammen mit der vollständigen, konsolidierten Projektdokumentation.
 
 ---
 
-## 🚀 Key Features (Release 1.1.0)
+## 🚀 Key Features (Release 2.0.0)
 
-- 🎧 **Media3 ExoPlayer & Android Auto:** Nahtlose Hintergrund-Wiedergabe, Automotive-Integration, variabler Speed (0.75x–2.0x) & Smart Rewind.
-- 📦 **.abook Container & SAF:** Import & Export von `.abook`-Dateien (ZIP mit `manifest.json`, Cover & Audio).
-- 📁 **Smarter Ordner-Scanner:** Automatische CD1/CD2 Unterordner-Zusammenführung & Duplikaterkennung.
-- 🌙 **OLED True Black Theme & Paper Look:** Warmes Bibliotheks-Design & stromsparendes Reinschwarz-Design für den Player.
+- 🎧 **Media3 ExoPlayer & Android Auto:** Nahtlose Hintergrund-Wiedergabe, Automotive-Integration, variabler Speed (0.75x–2.0x), präzises Seeking & Smart Rewind.
+- 🔍 **Online Metadaten- & Cover-Suche:** Integrierte Suche via Audible (DE) und iTunes mit interaktiver Trefferauswahl und HD-Cover-Vorschau.
+- 📦 **.abook Container & SAF:** Import & Export von `.abook`-Dateien (ZIP mit `manifest.json`, Cover & Audio) mit Schutz vor Zip-Slip.
+- 📁 **Smarter Ordner-Scanner & Dynamische Kapitel-Erkennung:** Automatische CD1/CD2 Unterordner-Zusammenführung, Duplikaterkennung & on-the-fly Playlist-Generierung.
+- 🛡️ **Robuste Datenbank-Architektur:** Room-Datenbank mit Kaskadenschutz gegen unabsichtlichen Datenverlust.
+- 🚗 **Car Mode:** Spezieller Fahrmodus mit riesigen Schaltflächen für ablenkungsfreie Bedienung im Auto.
+- 🌙 **OLED True Black Theme & Paper Look:** Warmes Bibliotheks-Design & stromsparendes Reinschwarz-Design (#000000) für den Player.
 - ⏰ **Sleep Timer & Shake to Extend:** Abschalttimer (inkl. am Kapitelende) & Schütteln zum Verlängern (+15 Min.).
-- 📊 **Lokale Hörstatistiken:** Tägliche/wöchentliche Auswertung & Streaks (100% datenschutzfreundlich).
-- 📚 **Serien-Verwaltung & OpenLibrary Scraper:** Buchreihen-Sortierung, Metadaten-Editor & Cover-Download.
-- ⚡ **Homescreen Widget, Skip Silence & FLAC Support:** Widgets, Stille überspringen, FLAC-Codec-Support & Mehrsprachigkeit (DE/EN).
+- 📊 **Lokale Hörstatistiken:** Tägliche/wöchentliche Auswertung & Streaks (100% datenschutzfreundlich, offline).
+- 📚 **Serien- & Sprecher-Verwaltung:** Buchreihen-Sortierung, Sprecher-Suche, Metadaten-Editor.
+- ⚡ **Homescreen Widget, Skip Silence & FLAC Support:** Widgets, Stille überspringen, FLAC/MP3/M4A/AAC/OGG-Support & Mehrsprachigkeit (DE/EN).
 
 ---
+
+## 📸 Screenshots & Benutzeroberfläche
+
+| Bibliothek (Listenansicht) | Bibliothek (Rasteransicht) | OLED Audioplayer | Kapitelübersicht |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/01_library_list.png" width="220" alt="Bibliothek Liste" /> | <img src="docs/screenshots/02_library_grid.png" width="220" alt="Bibliothek Raster" /> | <img src="docs/screenshots/03_player.png" width="220" alt="OLED Player" /> | <img src="docs/screenshots/04_chapters.png" width="220" alt="Kapitelübersicht" /> |
+| *Listenansicht mit Mini-Player* | *2-Spalten-Raster mit Cover-Art* | *Reinschwarz (#000000) Stage* | *Live-Wellenform am aktiven Track* |
+
+| Sound & Equalizer | Wiedergabetempo | Player-Menü | Hörbuch-Details |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/05_equalizer.png" width="220" alt="Sound & Equalizer" /> | <img src="docs/screenshots/06_speed.png" width="220" alt="Wiedergabetempo" /> | <img src="docs/screenshots/07_player_menu.png" width="220" alt="Player Optionen" /> | <img src="docs/screenshots/08_details.png" width="220" alt="Hörbuch Details" /> |
+| *Boost, Stille überspringen & Presets* | *0.75x–2.0x & Stufenlos* | *Sleep-Timer, Lesezeichen & Auto* | *Metadaten, Figuren & Export* |
+
+| Online-Metadatensuche | Metadaten-Editor | Technische Spezifikationen |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/09_metadata_search.png" width="220" alt="Online-Metadatensuche" /> | <img src="docs/screenshots/10_metadata_edit.png" width="220" alt="Metadaten bearbeiten" /> | <img src="docs/screenshots/11_technical_info.png" width="220" alt="Technische Spezifikationen" /> |
+| *Audible & iTunes Live-Suche* | *Reihen-, Band- & Sprecher-Editor* | *.abook Container & Audio-Encoding* |
+
+---
+
 
 ## 📚 Offizielle Projektdokumentation
 
@@ -69,18 +94,34 @@ cd ABookPlayer
 
 ## 📊 Aktueller Status
 
-- **Entwicklungsstand:** 🎉 **100% abgeschlossen (Release 1.1.0 / Phasen 0–15)**
+- **Entwicklungsstand:** 🎉 **100% abgeschlossen (Release 2.0.0 / Phasen 0–24)**
 - **Build-Ergebnis:** 🟢 `BUILD SUCCESSFUL` (Debug & Release APKs)
-- **Test-Ergebnis:** 🟢 Alle Unit-, ViewModel-, Storage-, Service- & DAO-Tests bestanden
+- **Test-Ergebnis:** 🟢 Alle 53 Unit-, ViewModel-, Storage-, Service- & DAO-Tests bestanden
 
 ---
 
-## 🌐 Git-Veröffentlichung & Remote Push
+## 🌐 Git-Veröffentlichung & GitHub-Upload
 
-Dieses Repository ist mit Git versioniert. Um das Projekt auf GitHub oder ein anderes Git-Remote zu veröffentlichen:
+Das Projekt kann automatisiert zu [**github.com/LexAD66/ABookPlayer**](https://github.com/LexAD66/ABookPlayer) hochgeladen werden:
 
+### Option A: Automatisches Upload-Skript (Empfohlen)
+Einfach die Datei **`upload_github.bat`** per Doppelklick starten oder in PowerShell ausführen:
+```powershell
+.\upload_github.ps1
+```
+*Das Skript führt automatisch die Vorprüfungen durch, bindet das Remote `origin` an `https://github.com/LexAD66/ABookPlayer.git`, staged & committet alle Änderungen, erstellt das Release-Tag `v2.0.0` und pusht den Branch `main` samt Tags zu GitHub.*
+
+### Option B: Manuell über die Git-Befehlszeile
 ```bash
-git remote add origin <DEIN_GIT_REPOSITORY_URL>
+# Remote anbinden
+git remote add origin https://github.com/LexAD66/ABookPlayer.git
+
+# Hauptbranch auf 'main' setzen
 git branch -M main
+
+# Änderungen committen und pushen
+git add .
+git commit -m "Release 2.0.0: Major stable release"
+git tag -a v2.0.0 -m "Release v2.0.0: ABook Player"
 git push -u origin main --tags
 ```

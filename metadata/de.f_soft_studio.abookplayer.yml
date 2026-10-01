@@ -2,9 +2,9 @@ Categories:
   - Multimedia
   - Audio
 License: MIT
-AuthorName: f-soft-studio
-SourceCode: https://github.com/f-soft-studio/ABookPlayer
-IssueTracker: https://github.com/f-soft-studio/ABookPlayer/issues
+AuthorName: LexAD66
+SourceCode: https://github.com/LexAD66/ABookPlayer
+IssueTracker: https://github.com/LexAD66/ABookPlayer/issues
 
 AutoName: ABook Player
 Summary: Open-source audiobook player for .abook containers and audio folders
@@ -24,7 +24,7 @@ Description: |-
   * Zero trackers, zero ads, zero proprietary analytics
 
 RepoType: git
-Repo: https://github.com/f-soft-studio/ABookPlayer.git
+Repo: https://github.com/LexAD66/ABookPlayer.git
 
 Builds:
   - versionName: 2.0.0

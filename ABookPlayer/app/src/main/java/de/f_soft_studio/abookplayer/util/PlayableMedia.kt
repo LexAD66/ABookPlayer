@@ -13,10 +13,15 @@ import java.io.File
  */
 object PlayableMedia {
 
-    /** true nur, wenn [path] auf eine existierende reguläre Datei zeigt (kein Verzeichnis, nicht leer). */
+    /** true nur, wenn [path] auf eine existierende reguläre Audiodatei zeigt (kein Ordner, kein Zip/Abook-Container). */
     fun isPlayableFile(path: String?): Boolean {
         if (path.isNullOrBlank()) return false
-        return File(path).isFile
+        val file = File(path)
+        if (!file.isFile) return false
+        val ext = file.extension.lowercase()
+        // Container und Archive sind keine direkt von ExoPlayer abspielbaren Audiodateien
+        if (ext in listOf("abook", "zip", "tar", "gz", "rar", "7z")) return false
+        return true
     }
 
     /** Filtert eine (Kapitel-)Pfadliste auf tatsächlich abspielbare Dateien; Reihenfolge bleibt erhalten. */

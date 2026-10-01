@@ -170,11 +170,16 @@ class AudiobookRepository(
                     if (context != null) {
                         try {
                             val uri = android.net.Uri.parse(path)
-                            val doc = androidx.documentfile.provider.DocumentFile.fromSingleUri(context, uri)
-                                ?: androidx.documentfile.provider.DocumentFile.fromTreeUri(context, uri)
-                            if (doc == null || !doc.exists()) {
-                                idsToDelete.add(book.id)
-                                orphansCount++
+                            val hasPermission = context.contentResolver.persistedUriPermissions.any {
+                                it.uri == uri || uri.toString().startsWith(it.uri.toString())
+                            }
+                            if (!hasPermission) {
+                                val doc = androidx.documentfile.provider.DocumentFile.fromSingleUri(context, uri)
+                                    ?: androidx.documentfile.provider.DocumentFile.fromTreeUri(context, uri)
+                                if (doc == null || !doc.exists()) {
+                                    idsToDelete.add(book.id)
+                                    orphansCount++
+                                }
                             }
                         } catch (e: Exception) {
                             // Ignorieren falls URI-Zugriff temporär nicht möglich

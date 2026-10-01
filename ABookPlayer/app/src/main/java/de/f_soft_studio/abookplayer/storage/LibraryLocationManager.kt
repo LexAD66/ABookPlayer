@@ -155,6 +155,16 @@ object LibraryLocationManager {
 
 
     /**
+     * Liefert den dauerhaften internen Speicherort für entpackte .abook-Dateien (context.filesDir/unpacked_abooks).
+     * Dieser Speicher wird im Gegensatz zu cacheDir niemals automatisch vom System oder durch "Cache leeren" gelöscht.
+     */
+    fun getUnpackedAbooksDir(context: Context): File {
+        return File(context.filesDir, "unpacked_abooks").apply {
+            if (!exists()) mkdirs()
+        }
+    }
+
+    /**
      * Liefert einen sicheren temporären Cache-Ordner im internen App-Speicher (context.cacheDir).
      * Temporäre Daten werden niemals im öffentlichen Ordner abgelegt.
      */

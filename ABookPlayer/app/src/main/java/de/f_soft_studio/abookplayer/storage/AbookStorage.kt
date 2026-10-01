@@ -401,11 +401,11 @@ class AbookStorage(
             try {
                 val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 context.contentResolver.takePersistableUriPermission(treeUri, takeFlags)
-            } catch (_: Exception) {}
-
-            try {
-                repository.cleanupDuplicatesAndOrphans(context)
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+                try {
+                    context.contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (_: Exception) {}
+            }
 
             val resolvedDir = resolveTreeUriToDirectory(treeUri)
             if (resolvedDir != null && resolvedDir.exists() && resolvedDir.isDirectory) {
@@ -621,13 +621,15 @@ class AbookStorage(
                 zos.write(manifestJsonStr.toByteArray(Charsets.UTF_8))
                 zos.closeEntry()
 
-                if (coverFileName != null && audiobook.coverUri != null) {
-                    val coverFile = File(audiobook.coverUri)
-                    if (coverFile.exists()) {
-                        val coverEntry = ZipEntry(coverFileName)
-                        zos.putNextEntry(coverEntry)
-                        coverFile.inputStream().use { input -> input.copyTo(zos) }
-                        zos.closeEntry()
+                if (coverFileName != null) {
+                    audiobook.coverUri?.let { uriStr ->
+                        val coverFile = File(uriStr)
+                        if (coverFile.exists()) {
+                            val coverEntry = ZipEntry(coverFileName)
+                            zos.putNextEntry(coverEntry)
+                            coverFile.inputStream().use { input -> input.copyTo(zos) }
+                            zos.closeEntry()
+                        }
                     }
                 }
 
@@ -672,7 +674,8 @@ class AbookStorage(
                     }
                 } else null
 
-                val unpackedDir = File(LibraryLocationManager.getTempDir(context), "unpacked_${zipFile.nameWithoutExtension.hashCode()}").apply {
+                val stableHash = kotlin.math.abs(zipFile.absolutePath.hashCode())
+                val unpackedDir = File(LibraryLocationManager.getUnpackedAbooksDir(context), "unpacked_${stableHash}_${zipFile.lastModified()}").apply {
                     if (!exists()) mkdirs()
                 }
 
@@ -686,8 +689,8 @@ class AbookStorage(
                         return@forEach
                     }
 
-                    val fileName = File(entry.name).name
-                    val extractedFile = safeTargetFile(unpackedDir, fileName)
+                    val sanitizedEntryName = entry.name.trimStart('/', '\\').replace('/', '_').replace('\\', '_')
+                    val extractedFile = safeTargetFile(unpackedDir, sanitizedEntryName)
                     if (extractedFile == null) {
                         Log.w("AbookStorage", "Unsicherer Zip-Eintrag übersprungen: ${entry.name}")
                         return@forEach
@@ -707,8 +710,9 @@ class AbookStorage(
                         return@use null
                     }
 
-                    audioEntriesMap[fileName.lowercase()] = extractedFile
+                    audioEntriesMap[File(entry.name).name.lowercase()] = extractedFile
                     audioEntriesMap[entry.name.lowercase()] = extractedFile
+                    audioEntriesMap[sanitizedEntryName.lowercase()] = extractedFile
                 }
 
                 var title = zipFile.nameWithoutExtension
@@ -1080,4 +1084,22 @@ class AbookStorage(
         }
         return@withContext migratedCount
     }
+
+    /**
+     * Stellt sicher, dass die Audiodateien eines .abook/.zip-Hörbuchs im persistenten Speicher entpackt sind.
+     * Wird aufgerufen, wenn die Kapiteldateien (z. B. nach Bereinigung oder Cache-Löschung) fehlen.
+     */
+    suspend fun ensureAbookUnpacked(audiobook: Audiobook): List<Chapter>? = withContext(Dispatchers.IO) {
+        val archiveFile = File(audiobook.filePath)
+        if (!archiveFile.isFile || !archiveFile.exists()) return@withContext null
+        if (!archiveFile.extension.equals("abook", true) && !archiveFile.extension.equals("zip", true)) return@withContext null
+
+        val parsed = parseAndSaveAbook(archiveFile) ?: return@withContext null
+        return@withContext try {
+            repository.getChaptersForAudiobook(audiobook.id).first()
+        } catch (_: Exception) {
+            null
+        }
+    }
 }
+

@@ -3,4 +3,8 @@
 # Gradle start up script for UN*X
 ##############################################################################
 DIR="$(cd "$(dirname "$0")" && pwd)"
-exec "$DIR/gradle/wrapper/gradle-wrapper" "$@"
+if [ -f "$DIR/gradle/wrapper/gradle-wrapper" ]; then
+    exec sh "$DIR/gradle/wrapper/gradle-wrapper" "$@"
+else
+    exec gradle "$@"
+fi

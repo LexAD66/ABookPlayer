@@ -27,8 +27,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FormatListNumbered
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Inventory
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.SdCard
 import androidx.compose.material.icons.filled.Search
@@ -186,7 +186,7 @@ fun EbookInfoScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.MenuBook,
+                                    imageVector = Icons.AutoMirrored.Filled.MenuBook,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(52.dp)

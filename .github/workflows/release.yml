@@ -24,7 +24,10 @@ jobs:
           cache: 'gradle'
 
       - name: Grant Execute Permission for Gradlew
-        run: chmod +x ABookPlayer/gradlew
+        run: |
+          chmod +x ABookPlayer/gradlew
+          chmod +x ABookPlayer/gradle/wrapper/gradle-wrapper || true
+
 
       - name: Run Unit Tests
         run: |

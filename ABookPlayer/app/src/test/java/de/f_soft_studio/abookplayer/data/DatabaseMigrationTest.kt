@@ -1,11 +1,13 @@
 package de.f_soft_studio.abookplayer.data
 
-import android.database.sqlite.SQLiteDatabase
+import android.content.Context
+import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import de.f_soft_studio.abookplayer.data.local.db.AbookDatabase
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -44,6 +46,7 @@ class DatabaseMigrationTest {
                 `author` TEXT NOT NULL,
                 `filePath` TEXT NOT NULL,
                 `coverUri` TEXT,
+                `description` TEXT,
                 `duration` INTEGER NOT NULL,
                 `currentPosition` INTEGER NOT NULL,
                 `lastPlayed` INTEGER NOT NULL
@@ -56,11 +59,13 @@ class DatabaseMigrationTest {
                 `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                 `audiobookId` INTEGER NOT NULL,
                 `title` TEXT NOT NULL,
-                `startPosition` INTEGER NOT NULL,
-                `endPosition` INTEGER NOT NULL
+                `startTime` INTEGER NOT NULL,
+                `audioPath` TEXT,
+                FOREIGN KEY(`audiobookId`) REFERENCES `audiobooks`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
             )
             """.trimIndent()
         )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_chapters_audiobookId` ON `chapters` (`audiobookId`)")
         db.execSQL(
             """
             CREATE TABLE IF NOT EXISTS `bookmarks` (
@@ -68,10 +73,12 @@ class DatabaseMigrationTest {
                 `audiobookId` INTEGER NOT NULL,
                 `position` INTEGER NOT NULL,
                 `note` TEXT NOT NULL,
-                `createdAt` INTEGER NOT NULL
+                `createdAt` INTEGER NOT NULL,
+                FOREIGN KEY(`audiobookId`) REFERENCES `audiobooks`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
             )
             """.trimIndent()
         )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_bookmarks_audiobookId` ON `bookmarks` (`audiobookId`)")
     }
 
     @Test
@@ -181,10 +188,10 @@ class DatabaseMigrationTest {
     @Test
     fun testMigration_10_to_11_cleansChapterExtensions() {
         val db = createInMemoryDb(10) { createV3Schema(it) }
-        db.execSQL("INSERT INTO chapters (audiobookId, title, startPosition, endPosition) VALUES (1, '01 - Prolog.mp3', 0, 1000)")
-        db.execSQL("INSERT INTO chapters (audiobookId, title, startPosition, endPosition) VALUES (1, '02 - Das Erwachen.m4b', 1000, 2000)")
-        db.execSQL("INSERT INTO chapters (audiobookId, title, startPosition, endPosition) VALUES (1, '03 - Epilog.flac', 2000, 3000)")
-        db.execSQL("INSERT INTO chapters (audiobookId, title, startPosition, endPosition) VALUES (1, 'Normaler Titel ohne Endung', 3000, 4000)")
+        db.execSQL("INSERT INTO chapters (audiobookId, title, startTime, audioPath) VALUES (1, '01 - Prolog.mp3', 0, NULL)")
+        db.execSQL("INSERT INTO chapters (audiobookId, title, startTime, audioPath) VALUES (1, '02 - Das Erwachen.m4b', 1000, NULL)")
+        db.execSQL("INSERT INTO chapters (audiobookId, title, startTime, audioPath) VALUES (1, '03 - Epilog.flac', 2000, NULL)")
+        db.execSQL("INSERT INTO chapters (audiobookId, title, startTime, audioPath) VALUES (1, 'Normaler Titel ohne Endung', 3000, NULL)")
 
         AbookDatabase.MIGRATION_10_11.migrate(db)
 
@@ -204,7 +211,7 @@ class DatabaseMigrationTest {
     fun testFullMigration_3_to_11_endToEnd() {
         val db = createInMemoryDb(3) { createV3Schema(it) }
         db.execSQL("INSERT INTO audiobooks (title, author, filePath, duration, currentPosition, lastPlayed) VALUES ('Herr der Ringe', 'Tolkien', '/storage/hdr.abook', 500000, 10000, 9999999)")
-        db.execSQL("INSERT INTO chapters (audiobookId, title, startPosition, endPosition) VALUES (1, 'Kapitel 1.mp3', 0, 1000)")
+        db.execSQL("INSERT INTO chapters (audiobookId, title, startTime, audioPath) VALUES (1, 'Kapitel 1.mp3', 0, NULL)")
 
         // Alle Migrationen nacheinander ausführen
         AbookDatabase.MIGRATION_3_4.migrate(db)
@@ -230,5 +237,56 @@ class DatabaseMigrationTest {
         assertTrue(chapterCursor.moveToFirst())
         assertEquals("Kapitel 1", chapterCursor.getString(0))
         chapterCursor.close()
+    }
+
+    @Test
+    fun testRoomDatabaseBuilderCanOpenMigratedV3Database() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val dbName = "room_migration_test.db"
+        context.deleteDatabase(dbName)
+
+        val config = SupportSQLiteOpenHelper.Configuration.builder(context)
+            .name(dbName)
+            .callback(object : SupportSQLiteOpenHelper.Callback(3) {
+                override fun onCreate(db: SupportSQLiteDatabase) {
+                    createV3Schema(db)
+                }
+                override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+            })
+            .build()
+        val helper = FrameworkSQLiteOpenHelperFactory().create(config)
+        val initialDb = helper.writableDatabase
+        initialDb.execSQL("INSERT INTO audiobooks (title, author, filePath, duration, currentPosition, lastPlayed) VALUES ('Test Buch', 'Test Autor', '/path/test.abook', 1000, 0, 500)")
+        initialDb.execSQL("INSERT INTO chapters (audiobookId, title, startTime, audioPath) VALUES (1, '01 - Prolog.mp3', 0, NULL)")
+        initialDb.close()
+
+        val roomDb = Room.databaseBuilder(
+            context,
+            AbookDatabase::class.java,
+            dbName
+        ).addMigrations(
+            AbookDatabase.MIGRATION_3_4,
+            AbookDatabase.MIGRATION_4_5,
+            AbookDatabase.MIGRATION_5_6,
+            AbookDatabase.MIGRATION_6_7,
+            AbookDatabase.MIGRATION_7_8,
+            AbookDatabase.MIGRATION_8_9,
+            AbookDatabase.MIGRATION_9_10,
+            AbookDatabase.MIGRATION_10_11
+        ).build()
+
+        runBlocking {
+            val book = roomDb.audiobookDao().getAudiobookById(1)
+            assertNotNull("Das migrierte Hörbuch muss auffindbar sein", book)
+            assertEquals("Test Buch", book?.title)
+            assertEquals(500L, book?.addedAt)
+
+            val chapters = roomDb.chapterDao().getChaptersForAudiobook(1)
+            assertEquals(1, chapters.size)
+            assertEquals("01 - Prolog", chapters[0].title)
+        }
+
+        roomDb.close()
+        context.deleteDatabase(dbName)
     }
 }

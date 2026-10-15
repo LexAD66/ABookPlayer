@@ -21,7 +21,7 @@ android {
     }
 
     // Release-Signatur kommt aus Umgebungsvariablen (GitHub-Secrets im Release-Workflow).
-    // Fehlen sie, wird mit dem Debug-Schlüssel signiert, damit die APK trotzdem installierbar ist.
+    // Fehlen sie, bleibt die Release-APK unsigniert (z. B. für das F-Droid-Rezept).
     val releaseKeystore = System.getenv("ABOOK_KEYSTORE_FILE")?.let { file(it) }?.takeIf { it.exists() }
     signingConfigs {
         if (releaseKeystore != null) {
@@ -36,10 +36,8 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (releaseKeystore != null) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
+            if (releaseKeystore != null) {
+                signingConfig = signingConfigs.getByName("release")
             }
             isMinifyEnabled = true
             isShrinkResources = true

@@ -37,8 +37,8 @@ jobs:
           chmod +x ABookPlayer/gradlew
           chmod +x ABookPlayer/gradle/wrapper/gradle-wrapper || true
 
-      # Optional: eigener Release-Schlüssel über Repository-Secrets.
-      # Ohne Secrets wird die APK mit dem Debug-Schlüssel signiert (installierbar, aber nicht Play-Store-tauglich).
+      # Release-Schlüssel aus Repository-Secrets. Ein fester Schlüssel ist Pflicht für Veröffentlichungen,
+      # sonst lassen sich spätere APKs nicht als Update über frühere installieren.
       - name: Decode Release Keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.ABOOK_KEYSTORE_BASE64 }}
@@ -47,8 +47,11 @@ jobs:
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
             echo "ABOOK_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
             echo "Release-Keystore gefunden, APK wird damit signiert."
+          elif [ "$PUBLISH" = "true" ]; then
+            echo "::error::Secret ABOOK_KEYSTORE_BASE64 fehlt. Ohne festen Release-Schlüssel wird kein Release veröffentlicht."
+            exit 1
           else
-            echo "Kein Release-Keystore hinterlegt, APK wird mit Debug-Schlüssel signiert."
+            echo "Kein Release-Keystore (PR-Prüfung), APK bleibt unsigniert."
           fi
 
       - name: Run Unit Tests

@@ -199,8 +199,8 @@ Diese Datei dokumentiert alle **abgeschlossenen Fortschritte** sowie alle **gepl
 
 ### GitHub-Releases mit installierbarer APK
 - [x] `release.yml`: Tag `v*` pushen → Tests, `assembleRelease`, GitHub-Release mit `ABookPlayer-<tag>.apk` und automatisch erzeugten Release-Notes (vorher fehlerhafter `body_path` ohne `ABookPlayer/`-Präfix).
-- [x] Release-Signatur in `app/build.gradle.kts` über Umgebungsvariablen (`ABOOK_KEYSTORE_FILE`, `ABOOK_KEYSTORE_PASSWORD`, `ABOOK_KEY_ALIAS`, `ABOOK_KEY_PASSWORD`); ohne Keystore wird mit dem Debug-Schlüssel signiert, damit die APK installierbar bleibt.
-- [x] Optionale Repository-Secrets: `ABOOK_KEYSTORE_BASE64`, `ABOOK_KEYSTORE_PASSWORD`, `ABOOK_KEY_ALIAS`, `ABOOK_KEY_PASSWORD`.
+- [x] Release-Signatur in `app/build.gradle.kts` über Umgebungsvariablen (`ABOOK_KEYSTORE_FILE`, `ABOOK_KEYSTORE_PASSWORD`, `ABOOK_KEY_ALIAS`, `ABOOK_KEY_PASSWORD`); ohne Keystore bleibt die Release-APK unsigniert (F-Droid-Rezept erwartet `app-release-unsigned.apk`).
+- [x] Pflicht-Secrets für Veröffentlichungen (fester Schlüssel, damit Updates installierbar bleiben; ohne sie bricht der Release-Workflow ab): `ABOOK_KEYSTORE_BASE64`, `ABOOK_KEYSTORE_PASSWORD`, `ABOOK_KEY_ALIAS`, `ABOOK_KEY_PASSWORD`.
 
 ---
 

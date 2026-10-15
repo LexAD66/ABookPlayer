@@ -20,8 +20,27 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
+    // Release-Signatur kommt aus Umgebungsvariablen (GitHub-Secrets im Release-Workflow).
+    // Fehlen sie, wird mit dem Debug-Schlüssel signiert, damit die APK trotzdem installierbar ist.
+    val releaseKeystore = System.getenv("ABOOK_KEYSTORE_FILE")?.let { file(it) }?.takeIf { it.exists() }
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("ABOOK_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ABOOK_KEY_ALIAS")
+                keyPassword = System.getenv("ABOOK_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = if (releaseKeystore != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

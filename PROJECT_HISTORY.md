@@ -197,6 +197,11 @@ Diese Datei dokumentiert alle **abgeschlossenen Fortschritte** sowie alle **gepl
 - [x] **3. Defekt „Unlöschbar":** [`AudiobookRepository.cleanupDuplicatesAndOrphans`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/main/java/de/f_soft_studio/abookplayer/data/repository/AudiobookRepository.kt) – ein Buch gilt jetzt auch dann als verwaist, wenn sein Pfad ein Verzeichnis ohne Audiodateien (`FolderScanner.isAudioFile`, `maxDepth 5`) ist.
 - [x] **4. Testabdeckung & Build:** [`DuplicateDetectorTest.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/test/java/de/f_soft_studio/abookplayer/util/DuplicateDetectorTest.kt) (6 Fälle inkl. Dauer-0-Kernfall) + [`CleanupOrphansTest.kt`](file:///c:/Users/olexa/Documents/MayDev/ABookPlayer/ABookPlayer/app/src/test/java/de/f_soft_studio/abookplayer/domain/CleanupOrphansTest.kt) (leerer Ordner → entfernt; Ordner mit Audio → bleibt; fehlender Pfad → weiterhin entfernt). 🟢 `./gradlew.bat testDebugUnitTest` + `installDebug` (`SM-S921B`). Nach Scan auf dem Gerät: 12 → 12, kein Wiederauftauchen.
 
+### GitHub-Releases mit installierbarer APK
+- [x] `release.yml`: Tag `v*` pushen → Tests, `assembleRelease`, GitHub-Release mit `ABookPlayer-<tag>.apk` und automatisch erzeugten Release-Notes (vorher fehlerhafter `body_path` ohne `ABookPlayer/`-Präfix).
+- [x] Release-Signatur in `app/build.gradle.kts` über Umgebungsvariablen (`ABOOK_KEYSTORE_FILE`, `ABOOK_KEYSTORE_PASSWORD`, `ABOOK_KEY_ALIAS`, `ABOOK_KEY_PASSWORD`); ohne Keystore wird mit dem Debug-Schlüssel signiert, damit die APK installierbar bleibt.
+- [x] Optionale Repository-Secrets: `ABOOK_KEYSTORE_BASE64`, `ABOOK_KEYSTORE_PASSWORD`, `ABOOK_KEY_ALIAS`, `ABOOK_KEY_PASSWORD`.
+
 ---
 
 ## 📌 Dokumentations-Links

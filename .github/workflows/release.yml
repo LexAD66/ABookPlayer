@@ -1,9 +1,15 @@
 name: Release Build
 
 on:
+  # Neues Release: Tag pushen, z. B. `git tag v2.0.1 && git push origin v2.0.1`
   push:
     tags:
       - 'v*'
+  # Prüft bei Änderungen am Release-Build nur, ob die Release-APK baut (ohne Veröffentlichung)
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'ABookPlayer/app/build.gradle.kts'
 
 jobs:
   release:
@@ -11,6 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || github.ref_name }}
+      PUBLISH: ${{ github.event_name != 'pull_request' }}
 
     steps:
       - name: Checkout Code
@@ -28,6 +37,19 @@ jobs:
           chmod +x ABookPlayer/gradlew
           chmod +x ABookPlayer/gradle/wrapper/gradle-wrapper || true
 
+      # Optional: eigener Release-Schlüssel über Repository-Secrets.
+      # Ohne Secrets wird die APK mit dem Debug-Schlüssel signiert (installierbar, aber nicht Play-Store-tauglich).
+      - name: Decode Release Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ABOOK_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "ABOOK_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "Release-Keystore gefunden, APK wird damit signiert."
+          else
+            echo "Kein Release-Keystore hinterlegt, APK wird mit Debug-Schlüssel signiert."
+          fi
 
       - name: Run Unit Tests
         run: |
@@ -35,18 +57,35 @@ jobs:
           ./gradlew test --stacktrace
 
       - name: Assemble Release APK
+        env:
+          ABOOK_KEYSTORE_PASSWORD: ${{ secrets.ABOOK_KEYSTORE_PASSWORD }}
+          ABOOK_KEY_ALIAS: ${{ secrets.ABOOK_KEY_ALIAS }}
+          ABOOK_KEY_PASSWORD: ${{ secrets.ABOOK_KEY_PASSWORD }}
         run: |
           cd ABookPlayer
           ./gradlew assembleRelease --stacktrace
 
+      - name: Rename APK
+        run: |
+          mkdir -p dist
+          cp ABookPlayer/app/build/outputs/apk/release/*.apk "dist/ABookPlayer-${RELEASE_TAG}.apk"
+          ls -l dist
+
+      - name: Upload APK (Workflow-Artefakt)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ABookPlayer-${{ env.RELEASE_TAG }}
+          path: dist/*.apk
+
       - name: Create GitHub Release
+        if: env.PUBLISH == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          name: "ABook Player ${{ github.ref_name }}"
-          body_path: fastlane/metadata/android/de-DE/changelogs/302.txt
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: "ABook Player ${{ env.RELEASE_TAG }}"
+          generate_release_notes: true
           draft: false
           prerelease: false
-          files: |
-            ABookPlayer/app/build/outputs/apk/release/*.apk
+          files: dist/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

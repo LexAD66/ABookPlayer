@@ -20,8 +20,25 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
+    // Release-Signatur kommt aus Umgebungsvariablen (GitHub-Secrets im Release-Workflow).
+    // Fehlen sie, bleibt die Release-APK unsigniert (z. B. für das F-Droid-Rezept).
+    val releaseKeystore = System.getenv("ABOOK_KEYSTORE_FILE")?.let { file(it) }?.takeIf { it.exists() }
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("ABOOK_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ABOOK_KEY_ALIAS")
+                keyPassword = System.getenv("ABOOK_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseKeystore != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

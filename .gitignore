@@ -40,3 +40,5 @@ Thumbs.db
 *.db
 /logcat_repro.txt
 /ui.xml
+*.code-workspace
+

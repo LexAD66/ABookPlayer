@@ -20,8 +20,29 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
+    // Release-Signatur kommt aus Umgebungsvariablen (GitHub-Secrets im Release-Workflow).
+    // Fehlen sie, bleibt die Release-APK unsigniert (z. B. für das F-Droid-Rezept).
+    // Wenn ABOOK_SIGN_WITH_DEBUG auf "true" steht (GitHub Actions Fallback), wird mit dem Debug-Schlüssel signiert.
+    val releaseKeystore = System.getenv("ABOOK_KEYSTORE_FILE")?.let { file(it) }?.takeIf { it.exists() }
+    val useDebugSigning = System.getenv("ABOOK_SIGN_WITH_DEBUG") == "true"
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("ABOOK_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ABOOK_KEY_ALIAS")
+                keyPassword = System.getenv("ABOOK_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseKeystore != null) {
+                signingConfig = signingConfigs.getByName("release")
+            } else if (useDebugSigning) {
+                signingConfig = signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
